@@ -416,3 +416,107 @@ function normalizeReply(r) {
     author:     r.profiles ? normalizeProfile(r.profiles) : null
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// SOCIETIES
+// ────────────────────────────────────────────────────────────
+
+export function normalizeSociety(s) {
+  if (!s) return null
+  return {
+    id:           s.id,
+    name:         s.name,
+    sector:       s.sector,
+    landmark:     s.landmark,
+    description:  s.description,
+    rules:        s.rules,
+    contactPhone: s.contact_phone,
+    totalFlats:   s.total_flats,
+    adminId:      s.admin_id,
+    isVerified:   s.is_verified,
+    createdAt:    s.created_at
+  }
+}
+
+export function normalizeSocietyPost(p) {
+  if (!p) return null
+  return {
+    id:            p.id,
+    societyId:     p.society_id,
+    postedBy:      p.posted_by,
+    type:          p.type,
+    title:         p.title,
+    content:       p.content,
+    eventDate:     p.event_date,
+    eventLocation: p.event_location,
+    status:        p.status,
+    pinToFeed:     p.pin_to_feed,
+    createdAt:     p.created_at,
+    society:       p.societies ? normalizeSociety(p.societies) : null
+  }
+}
+
+export async function getSocieties() {
+  const { data, error } = await supabase
+    .from('societies')
+    .select('*')
+    .order('name')
+  if (error) throw error
+  return (data || []).map(normalizeSociety)
+}
+
+export async function getFeedSocietyPosts() {
+  const { data, error } = await supabase
+    .from('society_posts')
+    .select('*, societies(name, sector)')
+    .eq('pin_to_feed', true)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map(normalizeSocietyPost)
+}
+
+export async function getSocietyPosts(societyId) {
+  const { data, error } = await supabase
+    .from('society_posts')
+    .select('*')
+    .eq('society_id', societyId)
+    .neq('status', 'removed')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map(normalizeSocietyPost)
+}
+
+export async function createSocietyPost(societyId, userId, postData) {
+  const { data, error } = await supabase
+    .from('society_posts')
+    .insert({
+      society_id:     societyId,
+      posted_by:      userId,
+      type:           postData.type,
+      title:          postData.title,
+      content:        postData.content,
+      event_date:     postData.eventDate || null,
+      event_location: postData.eventLocation || null,
+      status:         'active',
+      pin_to_feed:    postData.pinToFeed || false
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeSocietyPost(data)
+}
+
+export async function updateSocietyPost(id, updates) {
+  const dbUpdates = {}
+  if (updates.status !== undefined)   dbUpdates.status = updates.status
+  if (updates.pinToFeed !== undefined) dbUpdates.pin_to_feed = updates.pinToFeed
+  const { data, error } = await supabase
+    .from('society_posts')
+    .update(dbUpdates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeSocietyPost(data)
+}

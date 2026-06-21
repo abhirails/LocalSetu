@@ -11,13 +11,16 @@ import PostDetailScreen      from './screens/PostDetailScreen'
 import ProviderDetailScreen  from './screens/ProviderDetailScreen'
 import ProfileScreen         from './screens/ProfileScreen'
 import AdminScreen           from './screens/AdminScreen'
+import SocietyListScreen     from './screens/SocietyListScreen'
+import SocietyDetailScreen   from './screens/SocietyDetailScreen'
+import SocietyAdminScreen    from './screens/SocietyAdminScreen'
 
-// ── Loading splash while Supabase session is being restored ──
+// Loading splash while Supabase session is being restored
 function LoadingScreen() {
   return (
     <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
       <div style={{ textAlign: 'center', padding: 32 }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🏘️</div>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>&#x1F3D8;</div>
         <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--primary)' }}>
           Local<span style={{ color: 'var(--navy)' }}>Setu</span>
         </div>
@@ -25,17 +28,16 @@ function LoadingScreen() {
           <div className="spinner" />
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12 }}>
-          Connecting to your locality…
+          Connecting to your locality...
         </div>
       </div>
     </div>
   )
 }
 
-// ── Guard: redirect to login if not authenticated ──
+// Guard: redirect to login if not authenticated
 function AuthGuard({ children }) {
   const { state } = useApp()
-
   if (state.loading) return <LoadingScreen />
   if (!state.currentUser) return <Navigate to="/login" replace />
   return children
@@ -43,7 +45,6 @@ function AuthGuard({ children }) {
 
 function AppRoutes() {
   const { state } = useApp()
-
   if (state.loading) return <LoadingScreen />
 
   return (
@@ -57,10 +58,13 @@ function AppRoutes() {
         <Route path="/right-now"     element={<AuthGuard><RightNowScreen /></AuthGuard>} />
         <Route path="/help"          element={<AuthGuard><HelpScreen /></AuthGuard>} />
         <Route path="/create"        element={<AuthGuard><CreatePostScreen /></AuthGuard>} />
-        <Route path="/post/:id"      element={<AuthGuard><PostDetailScreen /></AuthGuard>} />
+        <Route path="/post/:id"      element={<PostDetailScreen />} />
         <Route path="/provider/:id"  element={<AuthGuard><ProviderDetailScreen /></AuthGuard>} />
         <Route path="/profile"       element={<AuthGuard><ProfileScreen /></AuthGuard>} />
         <Route path="/admin"         element={<AuthGuard><AdminScreen /></AuthGuard>} />
+        <Route path="/societies"     element={<AuthGuard><SocietyListScreen /></AuthGuard>} />
+        <Route path="/society/:id"   element={<AuthGuard><SocietyDetailScreen /></AuthGuard>} />
+        <Route path="/society-admin" element={<AuthGuard><SocietyAdminScreen /></AuthGuard>} />
         <Route
           path="/"
           element={<Navigate to={state.currentUser ? '/home' : '/login'} replace />}

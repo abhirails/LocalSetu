@@ -54,21 +54,19 @@ export default function PostCard({ post, compact = false }) {
     navigate(`/post/${post.id}`)
   }
 
-  const handleSave = (e) => {
+  const handleSave = (e) => { e.stopPropagation(); actions.savePost(post.id) }
+  const handleReport = (e) => { e.stopPropagation(); setShowReport(true) }
+
+  const handleShare = async (e) => {
     e.stopPropagation()
-    actions.savePost(post.id)
+    const url = `${window.location.origin}/post/${post.id}`
+    if (navigator.share) {
+      try { await navigator.share({ title: 'LocalSetu', text: post.content.slice(0, 80), url }); return } catch {}
+    }
+    try { await navigator.clipboard.writeText(url) } catch {}
   }
 
-  const handleReport = (e) => {
-    e.stopPropagation()
-    setShowReport(true)
-  }
-
-  const submitReport = (reason) => {
-    actions.reportPost(post.id, reason)
-    setShowReport(false)
-  }
-
+  const submitReport = (reason) => { actions.reportPost(post.id, reason); setShowReport(false) }
   const goToDetail = () => navigate(`/post/${post.id}`)
 
   return (
@@ -80,20 +78,17 @@ export default function PostCard({ post, compact = false }) {
             <div className="post-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {author?.name || 'Local Resident'}
               {isNearby && (
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#15803D', background: '#DCFCE7', borderRadius: 4, padding: '1px 5px', letterSpacing: 0.2 }}>
-                  📍 Near you
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#15803D', background: '#DCFCE7', borderRadius: 4, padding: '1px 5px' }}>
+                  Near you
                 </span>
               )}
             </div>
             <div className="post-sub-meta">
-              <span className="post-locality">📍 {post.locality}</span>
+              <span className="post-locality">{post.locality}</span>
               <span className="post-dot" />
               <span className="post-time">{timeAgo(post.createdAt)}</span>
               {post.isPinned && (
-                <>
-                  <span className="post-dot" />
-                  <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>📌 Pinned</span>
-                </>
+                <><span className="post-dot" /><span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>Pinned</span></>
               )}
             </div>
           </div>
@@ -103,66 +98,46 @@ export default function PostCard({ post, compact = false }) {
         <p className="post-content">{post.content}</p>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-          <span className="post-expiry">⏱ {timeUntil(post.expiresAt)}</span>
-          {post.isFulfilled && <span className="tag-fulfilled">✅ Fulfilled</span>}
+          <span className="post-expiry">{timeUntil(post.expiresAt)}</span>
+          {post.isFulfilled && <span className="tag-fulfilled">Fulfilled</span>}
           {post.neededBy && !post.isFulfilled && (
             <span style={{ fontSize: 11, color: 'var(--warning)', fontWeight: 600 }}>
-              🕐 Needed by {new Date(post.neededBy).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              Needed by {new Date(post.neededBy).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
           {post.distanceRange && (
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              📏 {post.distanceRange === 'walking' ? 'Walking distance' : `Within ${post.distanceRange}`}
+              {post.distanceRange === 'walking' ? 'Walking distance' : `Within ${post.distanceRange}`}
             </span>
           )}
         </div>
 
         <div className="post-actions" onClick={e => e.stopPropagation()}>
           {post.type === 'right_now' && (
-            <button
-              className={`action-btn ${alreadyConfirmed ? 'active' : ''}`}
-              onClick={handleStillHappening}
-              title={alreadyConfirmed ? 'Already confirmed' : 'Still happening?'}
-            >
-              <span className="action-btn-icon">🔄</span>
+            <button className={`action-btn ${alreadyConfirmed ? 'active' : ''}`} onClick={handleStillHappening}>
               Still happening
-              {post.stillHappeningCount > 0 && (
-                <span className="action-btn-count">{post.stillHappeningCount}</span>
-              )}
+              {post.stillHappeningCount > 0 && <span className="action-btn-count">{post.stillHappeningCount}</span>}
             </button>
           )}
-
           {post.type === 'need_it_now' && !post.isFulfilled && (
             <button className="action-btn help-btn" onClick={handleICanHelp}>
-              <span className="action-btn-icon">🙋</span>
               I can help
-              {post.helperCount > 0 && (
-                <span className="action-btn-count">{post.helperCount}</span>
-              )}
+              {post.helperCount > 0 && <span className="action-btn-count">{post.helperCount}</span>}
             </button>
           )}
-
           <button className="action-btn" onClick={goToDetail}>
-            <span className="action-btn-icon">💬</span>
             {replyCount > 0 ? replyCount : 'Reply'}
           </button>
-
           <div className="action-spacer" />
-
+          <button className="action-icon-btn" onClick={handleShare} title="Share">Share</button>
           <button className={`action-icon-btn ${isSaved ? 'saved' : ''}`} onClick={handleSave} title={isSaved ? 'Unsave' : 'Save'}>
-            {isSaved ? '🔖' : '📌'}
+            {isSaved ? 'Saved' : 'Save'}
           </button>
-
           {!isMyPost && (
-            <button className="action-icon-btn" onClick={handleReport} title="Report" style={{ fontSize: 14 }}>
-              🚩
-            </button>
+            <button className="action-icon-btn" onClick={handleReport} title="Report">Report</button>
           )}
-
           {isMyPost && post.type === 'need_it_now' && !post.isFulfilled && (
-            <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }} title="Mark fulfilled" style={{ fontSize: 14 }}>
-              ✅
-            </button>
+            <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }}>Done</button>
           )}
         </div>
       </div>
@@ -171,14 +146,14 @@ export default function PostCard({ post, compact = false }) {
         <div className="overlay" onClick={() => setShowReport(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <div className="modal-title">🚩 Report this post</div>
+            <div className="modal-title">Report this post</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { id: 'false_info', label: '❌ False or inaccurate information' },
-                { id: 'spam', label: '📢 Spam or self-promotion' },
-                { id: 'inappropriate', label: '⚠️ Inappropriate or offensive' },
-                { id: 'wrong_category', label: '🏷️ Wrong category' },
-                { id: 'other', label: '📋 Other reason' }
+                { id: 'false_info', label: 'False or inaccurate information' },
+                { id: 'spam', label: 'Spam or self-promotion' },
+                { id: 'inappropriate', label: 'Inappropriate or offensive' },
+                { id: 'wrong_category', label: 'Wrong category' },
+                { id: 'other', label: 'Other reason' }
               ].map(r => (
                 <button key={r.id} className="demo-user-btn" onClick={() => submitReport(r.id)} style={{ padding: '12px 14px' }}>
                   <span style={{ fontSize: 14 }}>{r.label}</span>

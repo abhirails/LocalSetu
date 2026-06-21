@@ -112,4 +112,80 @@ BEGIN
      ARRAY['Excellent woodwork. Made custom wardrobe for our room.', 'Neat finishing, no wastage. Honest quotation.', 'Completed on time, no excuses.'],
      true, ARRAY[demo_user_id], demo_user_id);
 
+  -- ============================================================
+  -- SOCIETIES (Phase 2 seed — Kharghar)
+  -- ============================================================
+
+  -- Insert demo societies
+  INSERT INTO public.societies (id, name, sector, landmark, description, total_flats, is_verified)
+  VALUES
+    ('10000000-0000-0000-0000-000000000001',
+     'Shree Sainath CHS', 'Sector 20', 'Near Kharghar Railway Station',
+     'Shree Sainath Co-operative Housing Society with 96 flats across 4 wings. Est. 2009.',
+     96, true),
+
+    ('10000000-0000-0000-0000-000000000002',
+     'Omkar Heights', 'Sector 12', 'Opposite Central Park',
+     'Omkar Heights — 3 towers, 180 flats. Active residents welfare committee.',
+     180, true),
+
+    ('10000000-0000-0000-0000-000000000003',
+     'Vrindavan CHS', 'Sector 7', 'Near D-Mart Kharghar',
+     'Vrindavan Co-operative Housing Society. 64 flats, established community.',
+     64, true),
+
+    ('10000000-0000-0000-0000-000000000004',
+     'Palm Grove Residency', 'Sector 35', 'Near Central Park Golf Course',
+     'Palm Grove Residency — gated community with 220 flats across 5 wings.',
+     220, false),
+
+    ('10000000-0000-0000-0000-000000000005',
+     'Shivam Apartments', 'Sector 10', 'Near Kharghar Bus Depot',
+     'Shivam Apartments CHS. 48 flats, ground + 7 floors.',
+     48, false)
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Insert demo society posts (notices + events)
+  INSERT INTO public.society_posts (society_id, posted_by, type, title, content, event_date, event_location, pin_to_feed)
+  VALUES
+    -- Shree Sainath CHS notices
+    ('10000000-0000-0000-0000-000000000001', demo_user_id,
+     'notice', 'Water supply disruption — 15 June',
+     'Due to CIDCO pipeline maintenance, water supply to Wing A and B will be disrupted on 15 June from 9 AM to 3 PM. Please store water in advance. Inconvenience regretted.',
+     NULL, NULL, true),
+
+    ('10000000-0000-0000-0000-000000000001', demo_user_id,
+     'notice', 'Parking reminder — no overnight parking in visitor slots',
+     'Residents are requested not to park in visitor slots overnight. Action will be taken for repeated violations. Visitor slots are for guests only (max 8 hours).',
+     NULL, NULL, true),
+
+    ('10000000-0000-0000-0000-000000000001', demo_user_id,
+     'event', 'Annual Society Meeting — 28 June',
+     'Annual General Meeting of Shree Sainath CHS will be held on 28 June at 7 PM in the community hall. Agenda: maintenance bill review, security upgrades, terrace garden proposal. All flat owners requested to attend.',
+     NOW() + INTERVAL '7 days', 'Community Hall, Ground Floor', true),
+
+    -- Omkar Heights notices
+    ('10000000-0000-0000-0000-000000000002', demo_user_id,
+     'notice', 'Lift maintenance — Tower B lift out of service',
+     'Tower B lift will be under maintenance on 12 June (tomorrow) from 10 AM to 2 PM. Residents are requested to use the staircase or Tower A lift during this time. Apologies for the inconvenience.',
+     NULL, NULL, true),
+
+    ('10000000-0000-0000-0000-000000000002', demo_user_id,
+     'event', 'Yoga and wellness camp — Sunday morning',
+     'Free yoga camp for all residents this Sunday, 7 AM to 8:30 AM at the podium garden. Certified instructor from Kharghar Yoga Kendra. Bring your own mat. Open to all ages — children welcome.',
+     NOW() + INTERVAL '3 days', 'Podium Garden, Tower A side', true),
+
+    -- Vrindavan CHS
+    ('10000000-0000-0000-0000-000000000003', demo_user_id,
+     'notice', 'CCTV upgrade completed',
+     'We are pleased to inform all residents that the CCTV upgrade project is now complete. 14 new HD cameras installed at all entry/exit points and stairwells. Recording is stored for 30 days.',
+     NULL, NULL, false),
+
+    -- Palm Grove event
+    ('10000000-0000-0000-0000-000000000004', demo_user_id,
+     'event', 'Children''s Day celebration — 14 June',
+     'Palm Grove Residency Children''s Day celebration on 14 June, 5 PM onwards at the clubhouse. Games, prizes, snacks for all kids up to age 14. Organized by the Residents Welfare Committee.',
+     NOW() + INTERVAL '1 day', 'Clubhouse, Level 1', true)
+  ON CONFLICT DO NOTHING;
+
 END $$;

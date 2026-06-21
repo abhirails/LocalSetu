@@ -18,14 +18,13 @@ const WATCH_OPTIONS = {
 export function useCurrentLocation() {
   const [locality, setLocality]   = useState(null)
   const [coords, setCoords]       = useState(null)
-  const [status, setStatus]       = useState('idle') // idle | loading | granted | denied | error
+  const [status, setStatus]       = useState('idle')
   const [error, setError]         = useState(null)
 
   const lastCoordsRef = useRef(null)
   const watchIdRef    = useRef(null)
 
   const geocodePosition = useCallback(async (lat, lng) => {
-    // Skip if we haven't moved significantly
     if (lastCoordsRef.current) {
       const moved = distanceMeters(
         lastCoordsRef.current.lat, lastCoordsRef.current.lng, lat, lng
@@ -35,17 +34,14 @@ export function useCurrentLocation() {
         return
       }
     }
-
     lastCoordsRef.current = { lat, lng }
     setCoords({ lat, lng })
-
     try {
       const name = await reverseGeocode(lat, lng)
       setLocality(name)
       setStatus('granted')
       setError(null)
     } catch (e) {
-      // Keep old locality, just log
       console.warn('LocalSetu: geocode error', e)
     }
   }, [])
@@ -56,14 +52,10 @@ export function useCurrentLocation() {
       setError('Location not supported in this browser.')
       return
     }
-
     setStatus('loading')
     setError(null)
-
     watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        geocodePosition(pos.coords.latitude, pos.coords.longitude)
-      },
+      (pos) => { geocodePosition(pos.coords.latitude, pos.coords.longitude) },
       (err) => {
         if (err.code === 1) {
           setStatus('denied')
@@ -89,7 +81,6 @@ export function useCurrentLocation() {
     startWatching()
   }, [startWatching, stopWatching])
 
-  // Start watching on mount, stop on unmount
   useEffect(() => {
     startWatching()
     return stopWatching

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email         TEXT,
   locality      TEXT NOT NULL DEFAULT 'Kharghar',
   role          TEXT NOT NULL DEFAULT 'resident'
-                  CHECK (role IN ('resident', 'admin', 'moderator')),
+                  CHECK (role IN ('resident', 'admin', 'moderator', 'society_admin')),
+  society_id    UUID,  -- set when role = 'society_admin'; FK added after societies table
   is_verified   BOOLEAN NOT NULL DEFAULT false,
   trust_score   INTEGER NOT NULL DEFAULT 50,
   posts_count   INTEGER NOT NULL DEFAULT 0,
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   distance_range        TEXT DEFAULT '2km',
   helper_count          INTEGER NOT NULL DEFAULT 0,
   is_fulfilled          BOOLEAN NOT NULL DEFAULT false,
+  reminder_sent_at      TIMESTAMPTZ,                     -- set when expiry reminder push is sent
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -326,7 +328,120 @@ CREATE POLICY "Users can unsave posts"
   USING (auth.uid() = user_id);
 
 -- ============================================================
--- 11. REALTIME (enable for live feed)
+-- 11. SOCIETIES + SOCIETY POSTS (Phase 2)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.societies (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name          TEXT NOT NULL,
+  sector        TEXT NOT NULL,          -- e.g. "Sector 20"
+  landmark      TEXT,
+  description   TEXT,
+  rules         TEXT,
+  contact_phone TEXT,
+  total_flats   INTEGER,
+  admin_id      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  is_verified   BOOLEAN NOT NULL DEFAULT false,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Now wire the FK from profiles.society_id
+ALTER TABLE public.profiles
+  ADD CONSTRAINT fk_profiles_society
+  FOREIGN KEY (society_id) REFERENCES public.societies(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS public.society_posts (
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  society_id      UUID REFERENCES public.societies(id) ON DELETE CASCADE NOT NULL,
+  posted_by       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  type            TEXT NOT NULL CHECK (type IN ('notice', 'event')),
+  title           TEXT NOT NULL CHECK (char_length(title) <= 120),
+  content         TEXT NOT NULL CHECK (char_length(content) <= 500),
+  event_date      TIMESTAMPTZ,           -- for events
+  event_location  TEXT,                  -- for events
+  status          TEXT NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active', 'resolved', 'removed')),
+  pin_to_feed     BOOLEAN NOT NULL DEFAULT true,  -- show in main KhargharConnect feed
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_society_posts_society   ON public.society_posts(society_id);
+CREATE INDEX IF NOT EXISTS idx_society_posts_feed      ON public.society_posts(pin_to_feed, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_societies_sector        ON public.societies(sector);
+
+-- RLS
+ALTER TABLE public.societies        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.society_posts    ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Societies visible to all"
+  ON public.societies FOR SELECT USING (true);
+
+CREATE POLICY "Society posts visible to all when active"
+  ON public.society_posts FOR SELECT
+  USING (status = 'active');
+
+CREATE POLICY "Society admins can insert posts"
+  ON public.society_posts FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid()
+        AND role = 'society_admin'
+        AND society_id = society_posts.society_id
+    )
+  );
+
+CREATE POLICY "Society admins can update their posts"
+  ON public.society_posts FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid()
+        AND role = 'society_admin'
+        AND society_id = society_posts.society_id
+    )
+  );
+
+CREATE POLICY "App admins can manage all society posts"
+  ON public.society_posts FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- ============================================================
+-- 11. PUSH SUBSCRIPTIONS (Web Push / VAPID)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  endpoint    TEXT NOT NULL,
+  p256dh      TEXT NOT NULL,
+  auth        TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT now() NOT NULL,
+  UNIQUE (user_id, endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subs_user ON public.push_subscriptions(user_id);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own push subscriptions"
+  ON public.push_subscriptions FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Service role (Edge Functions) can read all subscriptions to send pushes
+CREATE POLICY "Service role reads all subscriptions"
+  ON public.push_subscriptions FOR SELECT
+  USING (auth.role() = 'service_role');
+
+-- ============================================================
+-- 12. REALTIME (enable for live feed)
 -- ============================================================
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.posts;

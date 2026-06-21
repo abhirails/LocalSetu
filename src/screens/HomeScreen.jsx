@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useCurrentLocation } from '../hooks/useCurrentLocation'
-import { matchesLiveLocality } from '../lib/geocode'
+import { matchesLiveLocality, distanceMeters } from '../lib/geocode'
 import PostCard from '../components/PostCard'
 import ProviderCard from '../components/ProviderCard'
 import BottomNav from '../components/BottomNav'
 
 const TABS = [
-  { id: 'all', label: '🏠 All' },
-  { id: 'right_now', label: '⚡ Right Now' },
-  { id: 'need_it_now', label: '🙋 Need It Now' },
-  { id: 'verified_help', label: '🤝 Help' }
+  { id: 'all', label: 'All' },
+  { id: 'right_now', label: 'Right Now' },
+  { id: 'need_it_now', label: 'Need It Now' },
+  { id: 'verified_help', label: 'Help' }
 ]
 
 export default function HomeScreen() {
@@ -19,30 +19,51 @@ export default function HomeScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
 
-  // ── Live location ──
-  const { locality: liveLocality, status: locationStatus, error: locationError, requestLocation } = useCurrentLocation()
+  const { locality: liveLocality, coords: liveCoords, status: locationStatus, requestLocation } = useCurrentLocation()
+  const radiusFilter = state.radiusFilter
 
-  // Sync detected locality into global state so PostCard & other screens can use it
   useEffect(() => {
     if (liveLocality) {
-      actions.setLiveLocality(liveLocality, 'granted')
+      actions.setLiveLocality(liveLocality, liveCoords, 'granted')
     } else if (locationStatus === 'denied' || locationStatus === 'error') {
       actions.setLocationStatus(locationStatus)
     }
-  }, [liveLocality, locationStatus])
+  }, [liveLocality, liveCoords, locationStatus])
 
-  // ── Feed data ──
   const rightNowPosts  = helpers.getActivePosts('right_now')
   const needItNowPosts = helpers.getActivePosts('need_it_now')
   const providers = state.providers
     .filter(p => !helpers.isBlocked(p.id))
     .sort((a, b) => b.recommendationCount - a.recommendationCount)
+  const feedSocietyPosts = helpers.getFeedSocietyPosts ? helpers.getFeedSocietyPosts() : []
 
-  // Sort posts: near-you first, then pinned, then by recency
+  const RADIUS_OPTIONS = [
+    { label: 'All', value: null },
+    { label: '500m', value: 500 },
+    { label: '1 km', value: 1000 },
+    { label: '2 km', value: 2000 },
+  ]
+
+  const getPostDistance = (post) => {
+    if (!state.liveCoords || !post.lat || !post.lng) return null
+    return distanceMeters(state.liveCoords.lat, state.liveCoords.lng, post.lat, post.lng)
+  }
+
+  const isWithinRadius = (post) => {
+    if (!radiusFilter || !state.liveCoords) return true
+    const dist = getPostDistance(post)
+    if (dist === null) return true
+    return dist <= radiusFilter
+  }
+
   const sortWithNearby = (posts) => {
-    return [...posts].sort((a, b) => {
+    const filtered = posts.filter(isWithinRadius)
+    return [...filtered].sort((a, b) => {
+      const aDist = getPostDistance(a)
+      const bDist = getPostDistance(b)
       const aNear = liveLocality ? matchesLiveLocality(a.locality, liveLocality) : false
       const bNear = liveLocality ? matchesLiveLocality(b.locality, liveLocality) : false
+      if (aDist !== null && bDist !== null) return aDist - bDist
       if (aNear && !bNear) return -1
       if (!aNear && bNear) return 1
       if (a.isPinned && !b.isPinned) return -1
@@ -51,7 +72,7 @@ export default function HomeScreen() {
     })
   }
 
-  const allFeed = sortWithNearby([
+  const regularFeed = [
     ...rightNowPosts.filter(p => {
       const ageHrs = (Date.now() - new Date(p.createdAt)) / 3600000
       return ageHrs < 2
@@ -62,167 +83,104 @@ export default function HomeScreen() {
     }).slice(0, 2),
     ...rightNowPosts.slice(3),
     ...needItNowPosts.slice(2),
-  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i))
+  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
 
-  // ── Location banner ──
+  const allFeed = [
+    ...sortWithNearby(regularFeed),
+    ...feedSocietyPosts.slice(0, 5)
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
   const renderLocationBanner = () => {
     if (locationStatus === 'loading') {
       return (
-        <div style={{
-          background: '#F0F9FF',
-          borderBottom: '1px solid #BAE6FD',
-          padding: '8px 16px',
-          fontSize: 12,
-          color: '#0369A1',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
-          <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>🔄</span>
-          Detecting your location…
+        <div style={{ background: '#F0F9FF', borderBottom: '1px solid #BAE6FD', padding: '8px 16px', fontSize: 12, color: '#0369A1', display: 'flex', alignItems: 'center', gap: 8 }}>
+          Detecting your location...
         </div>
       )
     }
-
     if (liveLocality) {
       const isHome = state.currentUser?.locality?.toLowerCase().includes(liveLocality.toLowerCase())
         || liveLocality.toLowerCase().includes((state.currentUser?.locality || '').toLowerCase().split(' ')[0])
-
       return (
-        <div style={{
-          background: 'linear-gradient(90deg, #F0FDF4, #DCFCE7)',
-          borderBottom: '1px solid #BBF7D0',
-          padding: '8px 16px',
-          fontSize: 12,
-          color: '#15803D',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontWeight: 600
-        }}>
-          <span>📍</span>
+        <div style={{ background: 'linear-gradient(90deg, #F0FDF4, #DCFCE7)', borderBottom: '1px solid #BBF7D0', padding: '8px 16px', fontSize: 12, color: '#15803D', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
           <span>Live: <strong>{liveLocality}</strong></span>
-          {isHome && <span style={{ color: '#86EFAC', fontWeight: 400 }}>· Home area</span>}
+          {isHome && <span style={{ color: '#86EFAC', fontWeight: 400 }}>Home area</span>}
           <div style={{ flex: 1 }} />
-          <button
-            onClick={requestLocation}
-            style={{ fontSize: 11, color: '#15803D', fontWeight: 700, textDecoration: 'underline' }}
-          >
-            Refresh
-          </button>
+          <button onClick={requestLocation} style={{ fontSize: 11, color: '#15803D', fontWeight: 700, textDecoration: 'underline' }}>Refresh</button>
         </div>
       )
     }
-
     if (locationStatus === 'denied') {
       return (
-        <div style={{
-          background: '#FFFBEB',
-          borderBottom: '1px solid #FDE68A',
-          padding: '8px 16px',
-          fontSize: 12,
-          color: '#92400E',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6
-        }}>
-          <span>⚠️</span>
-          <span>Location blocked — showing all posts. Enable in browser settings.</span>
+        <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A', padding: '8px 16px', fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>Location blocked. Enable in browser settings.</span>
           <div style={{ flex: 1 }} />
-          <button
-            onClick={requestLocation}
-            style={{ fontSize: 11, color: '#92400E', fontWeight: 700, textDecoration: 'underline' }}
-          >
-            Retry
-          </button>
+          <button onClick={requestLocation} style={{ fontSize: 11, color: '#92400E', fontWeight: 700, textDecoration: 'underline' }}>Retry</button>
         </div>
       )
     }
-
     if (locationStatus === 'idle') {
       return (
-        <div style={{
-          background: '#F8FAFC',
-          borderBottom: '1px solid var(--border-light)',
-          padding: '8px 16px',
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6
-        }}>
-          <span>📍</span>
+        <div style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border-light)', padding: '8px 16px', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>{state.currentUser?.locality || 'Kharghar'}</span>
           <div style={{ flex: 1 }} />
-          <button
-            onClick={requestLocation}
-            style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}
-          >
-            Use live location
-          </button>
+          <button onClick={requestLocation} style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>Use live location</button>
         </div>
       )
     }
-
     return null
   }
 
-  // ── Feed render ──
   const renderFeed = () => {
     if (activeTab === 'all') {
       if (allFeed.length === 0) {
         return (
           <div className="empty-state">
-            <div className="empty-icon">🏘️</div>
+            <div className="empty-icon">Home</div>
             <div className="empty-title">Quiet right now</div>
             <div className="empty-sub">Be the first to share a local update in your area.</div>
-            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>
-              + Post something
-            </button>
+            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Post something</button>
           </div>
         )
       }
       return (
         <div className="card-list">
-          {allFeed.map(post => <PostCard key={post.id} post={post} />)}
+          {allFeed.map(post =>
+            post.societyId
+              ? <SocietyFeedCard key={post.id} post={post} onClick={() => navigate(`/society/${post.societyId}`)} />
+              : <PostCard key={post.id} post={post} />
+          )}
         </div>
       )
     }
-
     if (activeTab === 'right_now') {
       const sorted = sortWithNearby(rightNowPosts)
       if (sorted.length === 0) {
         return (
           <div className="empty-state">
-            <div className="empty-icon">⚡</div>
+            <div className="empty-icon">Flash</div>
             <div className="empty-title">No active updates</div>
             <div className="empty-sub">Post a real-time update like traffic, water issues, or power cuts.</div>
-            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>
-              + Right Now update
-            </button>
+            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Right Now update</button>
           </div>
         )
       }
       return <div className="card-list">{sorted.map(post => <PostCard key={post.id} post={post} />)}</div>
     }
-
     if (activeTab === 'need_it_now') {
       const sorted = sortWithNearby(needItNowPosts)
       if (sorted.length === 0) {
         return (
           <div className="empty-state">
-            <div className="empty-icon">🙋</div>
+            <div className="empty-icon">Hand</div>
             <div className="empty-title">No urgent requests</div>
             <div className="empty-sub">Post a local need — borrow, rideshare, or urgent help.</div>
-            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>
-              + Post a need
-            </button>
+            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Post a need</button>
           </div>
         )
       }
       return <div className="card-list">{sorted.map(post => <PostCard key={post.id} post={post} />)}</div>
     }
-
     if (activeTab === 'verified_help') {
       return (
         <div>
@@ -241,49 +199,48 @@ export default function HomeScreen() {
   return (
     <div className="app-container">
       <div className="screen">
-        {/* Header */}
         <div className="header">
           <div>
             <div className="header-logo">Local<span>Setu</span></div>
             <div className="header-locality">
-              {liveLocality
-                ? `📍 ${liveLocality}`
-                : `📍 ${state.currentUser?.locality || 'Kharghar'}`
-              }
+              {liveLocality ? `${liveLocality}` : `${state.currentUser?.locality || 'Kharghar'}`}
             </div>
           </div>
           <div className="header-actions">
-            <button className="icon-btn" onClick={() => navigate('/profile')} title="Profile">👤</button>
+            <button className="icon-btn" onClick={() => navigate('/profile')} title="Profile">Profile</button>
             {state.currentUser?.role === 'admin' && (
-              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin">🛡️</button>
+              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin">Admin</button>
             )}
           </div>
         </div>
 
-        {/* Live location banner */}
         {renderLocationBanner()}
 
-        {/* Tabs */}
+        {liveLocality && (
+          <div style={{ display: 'flex', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border-light)', background: '#FAFAFA', overflowX: 'auto', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>Radius:</span>
+            {RADIUS_OPTIONS.map(opt => (
+              <button key={String(opt.value)} onClick={() => actions.setRadiusFilter(opt.value)}
+                style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                  border: radiusFilter === opt.value ? '2px solid var(--primary)' : '1.5px solid var(--border-light)',
+                  background: radiusFilter === opt.value ? 'var(--primary)' : 'white',
+                  color: radiusFilter === opt.value ? 'white' : 'var(--text-secondary)',
+                  cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="tab-bar">
           {TABS.map(tab => (
-            <button
-              key={tab.id}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
+            <button key={tab.id} className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
               {tab.label}
             </button>
           ))}
         </div>
 
-        {/* Quick Stats Banner */}
-        <div style={{
-          background: 'linear-gradient(135deg, var(--primary-light) 0%, #FFF8F5 100%)',
-          padding: '10px 16px',
-          display: 'flex',
-          gap: 16,
-          borderBottom: '1px solid var(--border-light)'
-        }}>
+        <div style={{ background: 'linear-gradient(135deg, var(--primary-light) 0%, #FFF8F5 100%)', padding: '10px 16px', display: 'flex', gap: 16, borderBottom: '1px solid var(--border-light)' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--primary)' }}>{rightNowPosts.length}</div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Live Updates</div>
@@ -296,28 +253,59 @@ export default function HomeScreen() {
             <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--navy)' }}>{providers.filter(p => p.isVerified).length}</div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Verified Helpers</div>
           </div>
+          <div onClick={() => navigate('/societies')} style={{ textAlign: 'center', cursor: 'pointer' }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#6366f1' }}>{(state.societies || []).length}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Societies</div>
+          </div>
           <div style={{ flex: 1 }} />
-          <button
-            style={{
-              background: 'var(--primary)',
-              color: 'white',
-              borderRadius: 20,
-              padding: '6px 14px',
-              fontSize: 12,
-              fontWeight: 700,
-              alignSelf: 'center'
-            }}
-            onClick={() => navigate('/create')}
-          >
+          <button style={{ background: 'var(--primary)', color: 'white', borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, alignSelf: 'center' }}
+            onClick={() => navigate('/create')}>
             + Post
           </button>
         </div>
 
-        {/* Feed */}
         {renderFeed()}
       </div>
-
       <BottomNav />
+    </div>
+  )
+}
+
+function SocietyFeedCard({ post, onClick }) {
+  const isEvent = post.type === 'event'
+  const societyName = post.society?.name || 'Society'
+  const age = (dateStr) => {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.floor(hrs / 24)}d ago`
+  }
+  const formatEventDate = (dateStr) => {
+    if (!dateStr) return null
+    return new Date(dateStr).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  }
+  return (
+    <div onClick={onClick} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px', cursor: 'pointer', borderLeft: '3px solid #6366f1' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, background: '#6366f120', color: '#4338ca', padding: '2px 8px', borderRadius: 20 }}>
+          {societyName}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, background: isEvent ? 'rgba(99,102,241,0.1)' : 'rgba(234,179,8,0.1)', color: isEvent ? '#4338ca' : '#a16207', padding: '2px 8px', borderRadius: 20 }}>
+          {isEvent ? 'Event' : 'Notice'}
+        </span>
+        <span style={{ fontSize: 11.5, color: 'var(--text-light)', marginLeft: 'auto' }}>{age(post.createdAt)}</span>
+      </div>
+      <h3 style={{ margin: '0 0 5px', fontSize: 14.5, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 }}>{post.title}</h3>
+      {isEvent && post.eventDate && (
+        <p style={{ margin: '0 0 5px', fontSize: 12.5, color: '#4338ca', fontWeight: 600 }}>
+          {formatEventDate(post.eventDate)}{post.eventLocation && ` · ${post.eventLocation}`}
+        </p>
+      )}
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {post.content}
+      </p>
     </div>
   )
 }

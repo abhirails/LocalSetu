@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import * as db from '../lib/db'
-import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS } from '../data/demoData'
+import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS } from '../data/demoData'
 
 const AppContext = createContext(null)
 
@@ -28,8 +28,12 @@ function initDemoState() {
     replies: DEMO_REPLIES,
     reports: DEMO_REPORTS,
     savedPostIds: [],
+    societies: DEMO_SOCIETIES,
+    societyPosts: DEMO_SOCIETY_POSTS,
     liveLocality: null,
+    liveCoords: null,
     locationStatus: 'idle',
+    radiusFilter: null,
     loading: false,
     toast: null
   }
@@ -177,10 +181,33 @@ function reducer(state, action) {
       return { ...state, users: (state.users || []).map(u => u.id === action.userId ? { ...u, isWarned: true } : u) }
 
     // ── Live Location ──
+    // ── Societies ──
+    case 'SET_SOCIETIES':
+      return { ...state, societies: action.societies }
+    case 'SET_SOCIETY_POSTS':
+      return {
+        ...state,
+        societyPosts: [
+          ...state.societyPosts.filter(p => p.societyId !== action.societyId),
+          ...action.posts
+        ]
+      }
+    case 'ADD_SOCIETY_POST':
+      return { ...state, societyPosts: [action.post, ...state.societyPosts] }
+    case 'UPDATE_SOCIETY_POST':
+      return {
+        ...state,
+        societyPosts: state.societyPosts.map(p =>
+          p.id === action.post.id ? { ...p, ...action.post } : p
+        )
+      }
+
     case 'SET_LIVE_LOCALITY':
-      return { ...state, liveLocality: action.locality, locationStatus: action.status || 'granted' }
+      return { ...state, liveLocality: action.locality, liveCoords: action.coords || state.liveCoords, locationStatus: action.status || 'granted' }
     case 'SET_LOCATION_STATUS':
       return { ...state, locationStatus: action.status }
+    case 'SET_RADIUS_FILTER':
+      return { ...state, radiusFilter: action.radius }
 
     // ── Toast ──
     case 'SET_TOAST':
@@ -200,7 +227,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, () =>
     isSupabaseConfigured
-      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], liveLocality: null, locationStatus: 'idle', loading: true, toast: null }
+      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, loading: true, toast: null }
       : initDemoState()
   )
 
@@ -232,18 +259,22 @@ export function AppProvider({ children }) {
 
     const loadData = async (userId) => {
       try {
-        const [profile, posts, providers, savedIds, reports] = await Promise.all([
+        const [profile, posts, providers, savedIds, reports, societies, feedSocietyPosts] = await Promise.all([
           db.getProfile(userId),
           db.getPosts(),
           db.getProviders(),
           db.getSavedPostIds(userId),
-          db.getReports().catch(() => [])
+          db.getReports().catch(() => []),
+          db.getSocieties().catch(() => []),
+          db.getFeedSocietyPosts().catch(() => [])
         ])
         dispatch({ type: 'SET_USER', user: { ...profile, savedPosts: savedIds } })
         dispatch({ type: 'SET_POSTS', posts })
         dispatch({ type: 'SET_PROVIDERS', providers })
         dispatch({ type: 'SET_SAVED', ids: savedIds })
         dispatch({ type: 'SET_REPORTS', reports })
+        dispatch({ type: 'SET_SOCIETIES', societies })
+        feedSocietyPosts.forEach(p => dispatch({ type: 'ADD_SOCIETY_POST', post: p }))
       } catch (err) {
         console.error('LocalSetu: failed to load data', err)
         dispatch({ type: 'SET_LOADING', value: false })
@@ -286,7 +317,7 @@ export function AppProvider({ children }) {
           // Avoid duplicating optimistic inserts from the current user
           const exists = state.posts.some(p => p.id === payload.new.id)
           if (!exists) {
-            dispatch({ type: 'ADD_POST', post: db.normalizePost ? payload.new : payload.new })
+            dispatch({ type: "ADD_POST", post: payload.new })
           }
         }
       )
@@ -311,6 +342,8 @@ export function AppProvider({ children }) {
   }, [state.currentUser?.id])
 
   // ────────────────────────────────────────────────────────
+
+  // ────────────────────────────────────────────────────────
   // ACTIONS
   // ────────────────────────────────────────────────────────
 
@@ -319,7 +352,6 @@ export function AppProvider({ children }) {
     // ── AUTH ──
 
     login: async (user) => {
-      // Demo mode only
       dispatch({ type: 'SET_USER', user: { ...user, savedPosts: user.savedPosts || [] } })
     },
 
@@ -345,14 +377,13 @@ export function AppProvider({ children }) {
         isFulfilled: false
       }
       dispatch({ type: 'ADD_POST', post: optimistic })
-      toast('✅ Posted to your locality!')
+      toast('Posted to your locality!')
 
       if (isSupabaseConfigured) {
         try {
           const real = await db.createPost({ ...postData, userId: state.currentUser.id })
-          // Replace optimistic with real
           dispatch({ type: 'UPDATE_POST', post: { ...optimistic, ...real, id: real.id } })
-          dispatch({ type: 'ADMIN_REMOVE_POST', postId: optimistic.id }) // remove temp
+          dispatch({ type: 'ADMIN_REMOVE_POST', postId: optimistic.id })
           dispatch({ type: 'ADD_POST', post: real })
         } catch (err) {
           console.error('LocalSetu: failed to create post', err)
@@ -371,7 +402,7 @@ export function AppProvider({ children }) {
         lastRecommendedAt: new Date().toISOString()
       }
       dispatch({ type: 'ADD_PROVIDER', provider: optimistic })
-      toast('✅ Helper added to directory!')
+      toast('Helper added to directory!')
 
       if (isSupabaseConfigured) {
         try {
@@ -405,7 +436,7 @@ export function AppProvider({ children }) {
       const userId = state.currentUser?.id
       if (!userId) return
       dispatch({ type: 'CONFIRM_STILL_HAPPENING', postId, userId })
-      toast('✅ Confirmation added!')
+      toast('Confirmation added!')
 
       if (isSupabaseConfigured) {
         try {
@@ -418,7 +449,7 @@ export function AppProvider({ children }) {
 
     markICanHelp: async (postId) => {
       dispatch({ type: 'MARK_HELPER', postId })
-      toast('🙋 Great! Reply in the thread.')
+      toast('Great! Reply in the thread.')
 
       if (isSupabaseConfigured) {
         try {
@@ -431,7 +462,7 @@ export function AppProvider({ children }) {
 
     markFulfilled: async (postId) => {
       dispatch({ type: 'MARK_FULFILLED', postId })
-      toast('✅ Marked as fulfilled!')
+      toast('Marked as fulfilled!')
 
       if (isSupabaseConfigured) {
         try {
@@ -456,11 +487,9 @@ export function AppProvider({ children }) {
             await db.savePost(userId, postId)
           }
         } catch (err) {
-          // Revert optimistic
           dispatch({ type: 'TOGGLE_SAVED', postId })
         }
       } else {
-        // Demo: also update currentUser.savedPosts for compatibility
         const cu = state.currentUser
         if (cu) {
           const updatedSaved = isSaved
@@ -473,7 +502,7 @@ export function AppProvider({ children }) {
 
     reportPost: async (postId, reason, note) => {
       dispatch({ type: 'REPORT_POST_OPTIMISTIC', postId })
-      toast('🚩 Report submitted. Thank you!')
+      toast('Report submitted. Thank you!')
 
       if (isSupabaseConfigured) {
         try {
@@ -521,7 +550,6 @@ export function AppProvider({ children }) {
       const userId = state.currentUser?.id
       if (!userId) return
 
-      // Optimistic
       dispatch({
         type: 'UPDATE_PROVIDER',
         provider: {
@@ -535,7 +563,7 @@ export function AppProvider({ children }) {
           lastRecommendedAt: new Date().toISOString()
         }
       })
-      toast('⭐ Recommendation added!')
+      toast('Recommendation added!')
 
       if (isSupabaseConfigured) {
         try {
@@ -582,7 +610,7 @@ export function AppProvider({ children }) {
 
     adminVerifyProvider: async (providerId) => {
       dispatch({ type: 'ADMIN_VERIFY_PROVIDER', providerId })
-      toast('✅ Provider verified.')
+      toast('Provider verified.')
       if (isSupabaseConfigured) {
         await supabase.from('providers').update({ is_verified: true }).eq('id', providerId).catch(console.error)
       }
@@ -598,34 +626,101 @@ export function AppProvider({ children }) {
       toast('User banned.')
     },
 
-    setLiveLocality: (locality, status = 'granted') => {
-      dispatch({ type: 'SET_LIVE_LOCALITY', locality, status })
+    adminResolveReport: async (reportId) => {
+      dispatch({ type: 'UPDATE_REPORT', id: reportId, status: 'reviewed' })
+      if (isSupabaseConfigured) {
+        await db.updateReport(reportId, { status: 'reviewed' }).catch(console.error)
+      }
+    },
+
+    // ── SOCIETIES ──
+
+    loadSocieties: async () => {
+      if (isSupabaseConfigured) {
+        try {
+          const [societies, feedPosts] = await Promise.all([
+            db.getSocieties(),
+            db.getFeedSocietyPosts()
+          ])
+          dispatch({ type: 'SET_SOCIETIES', societies })
+          feedPosts.forEach(p => dispatch({ type: 'ADD_SOCIETY_POST', post: p }))
+        } catch (err) {
+          console.error('LocalSetu: loadSocieties failed', err)
+        }
+      }
+    },
+
+    loadSocietyPosts: async (societyId) => {
+      if (isSupabaseConfigured) {
+        try {
+          const posts = await db.getSocietyPosts(societyId)
+          dispatch({ type: 'SET_SOCIETY_POSTS', societyId, posts })
+        } catch (err) {
+          console.error('LocalSetu: loadSocietyPosts failed', err)
+        }
+      }
+    },
+
+    addSocietyPost: async (societyId, postData) => {
+      const optimistic = {
+        ...postData,
+        id: 'opt_sp_' + Date.now(),
+        societyId,
+        postedBy: state.currentUser?.id,
+        status: 'active',
+        createdAt: new Date().toISOString()
+      }
+      dispatch({ type: 'ADD_SOCIETY_POST', post: optimistic })
+      toast('Posted to society!')
+
+      if (isSupabaseConfigured) {
+        try {
+          const real = await db.createSocietyPost(societyId, state.currentUser.id, postData)
+          dispatch({ type: 'UPDATE_SOCIETY_POST', post: { ...optimistic, ...real } })
+        } catch (err) {
+          console.error('LocalSetu: addSocietyPost failed', err)
+        }
+      }
+    },
+
+    resolveSocietyPost: async (postId) => {
+      dispatch({ type: 'UPDATE_SOCIETY_POST', post: { id: postId, status: 'resolved' } })
+      toast('Marked as resolved.')
+      if (isSupabaseConfigured) {
+        await db.updateSocietyPost(postId, { status: 'resolved' }).catch(console.error)
+      }
+    },
+
+    removeSocietyPost: async (postId) => {
+      dispatch({ type: 'UPDATE_SOCIETY_POST', post: { id: postId, status: 'removed' } })
+      if (isSupabaseConfigured) {
+        await db.updateSocietyPost(postId, { status: 'removed' }).catch(console.error)
+      }
+    },
+
+    setLiveLocality: (locality, coords, status = 'granted') => {
+      dispatch({ type: 'SET_LIVE_LOCALITY', locality, coords, status })
     },
 
     setLocationStatus: (status) => {
       dispatch({ type: 'SET_LOCATION_STATUS', status })
     },
 
-    adminResolveReport: async (reportId) => {
-      dispatch({ type: 'UPDATE_REPORT', id: reportId, status: 'reviewed' })
-      if (isSupabaseConfigured) {
-        await db.updateReport(reportId, { status: 'reviewed' }).catch(console.error)
-      }
-    }
+    setRadiusFilter: (radius) => {
+      dispatch({ type: 'SET_RADIUS_FILTER', radius })
+    },
   }
 
   // ────────────────────────────────────────────────────────
-  // HELPERS (derived queries)
+  // HELPERS (derived queries, read-only)
   // ────────────────────────────────────────────────────────
 
   const helpers = {
     getPost: (id) => state.posts.find(p => p.id === id),
     getProvider: (id) => state.providers.find(p => p.id === id),
     getUser: (id) => {
-      // Try joined author data first (Supabase mode)
       const fromPosts = state.posts.find(p => p.userId === id)?.author
       if (fromPosts) return fromPosts
-      // Fall back to users array (demo mode)
       return (state.users || []).find(u => u.id === id) || null
     },
     getReplies: (postId) =>
@@ -655,6 +750,25 @@ export function AppProvider({ children }) {
 
     getFlaggedPosts: () =>
       state.posts.filter(p => p.status === 'flagged' || (p.reportCount || 0) >= 3),
+
+    // Society helpers
+    getSociety: (id) => state.societies.find(s => s.id === id),
+
+    getSocietyPosts: (societyId) =>
+      state.societyPosts
+        .filter(p => p.societyId === societyId && p.status !== 'removed')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+
+    getFeedSocietyPosts: () =>
+      state.societyPosts
+        .filter(p => p.pinToFeed && p.status === 'active')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+
+    isSocietyAdmin: () =>
+      state.currentUser?.role === 'society_admin',
+
+    getMySociety: () =>
+      state.societies.find(s => s.id === state.currentUser?.societyId),
   }
 
   return (
