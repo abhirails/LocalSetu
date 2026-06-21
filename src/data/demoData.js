@@ -291,8 +291,37 @@ export const DEMO_SOCIETY_POSTS = [
     id: 'sp_6', societyId: 'soc_4', postedBy: 'user_3', type: 'event',
     title: "Children's Day celebration - this Saturday",
     content: "Palm Grove Children's Day celebration on Saturday, 5 PM at the clubhouse. Games, prizes, snacks for all kids up to age 14.",
-    eventDate: daysAhead(2), eventLocation: 'Clubhouse, Level 1', status: 'active', pinToFeed: true, createdAt: hours(8)
+    eventDate: daysAhead(2), eventLocation: 'Clubhouse, Level 1', status: 'active', pinToFeed: true,
+    visibility: 'public', createdAt: hours(8)
+  },
+  // Members-only posts (Phase 3)
+  {
+    id: 'sp_7', societyId: 'soc_1', postedBy: 'user_1', type: 'notice',
+    title: 'Security guard duty roster — July',
+    content: 'Attached is the updated security guard roster for July. Gate A will have 2 guards after 10 PM following the recent incidents.',
+    eventDate: null, eventLocation: null, status: 'active', pinToFeed: false,
+    visibility: 'society', createdAt: hours(2)
+  },
+  {
+    id: 'sp_8', societyId: 'soc_1', postedBy: 'user_1', type: 'notice',
+    title: 'Committee meeting notes — 18 June',
+    content: 'Minutes from committee meeting: Approved ₹1.2L terrace garden budget. Water pump replacement scheduled for July 5. CCTV upgrade deferred to Q3.',
+    eventDate: null, eventLocation: null, status: 'active', pinToFeed: false,
+    visibility: 'committee', createdAt: hours(20)
   }
+]
+
+// Phase 3 — Society Members
+export const DEMO_SOCIETY_MEMBERS = [
+  // soc_1 (Shree Sainath) — user_1 is society admin (approved), user_2 approved resident, user_4 pending
+  { id: 'mem_1', societyId: 'soc_1', userId: 'user_1', role: 'admin',     status: 'approved', requestedAt: hours(48 * 30), reviewedAt: hours(48 * 29), reviewedBy: null },
+  { id: 'mem_2', societyId: 'soc_1', userId: 'user_2', role: 'resident',  status: 'approved', requestedAt: hours(48 * 20), reviewedAt: hours(48 * 19), reviewedBy: 'user_1' },
+  { id: 'mem_3', societyId: 'soc_1', userId: 'user_3', role: 'committee', status: 'approved', requestedAt: hours(48 * 25), reviewedAt: hours(48 * 24), reviewedBy: 'user_1' },
+  { id: 'mem_4', societyId: 'soc_1', userId: 'user_4', role: 'resident',  status: 'pending',  requestedAt: hours(3),       reviewedAt: null,           reviewedBy: null },
+  { id: 'mem_5', societyId: 'soc_1', userId: 'user_5', role: 'resident',  status: 'pending',  requestedAt: hours(8),       reviewedAt: null,           reviewedBy: null },
+  // soc_2 (Omkar Heights) — user_2 admin, user_3 approved resident
+  { id: 'mem_6', societyId: 'soc_2', userId: 'user_2', role: 'admin',     status: 'approved', requestedAt: hours(48 * 15), reviewedAt: hours(48 * 14), reviewedBy: null },
+  { id: 'mem_7', societyId: 'soc_2', userId: 'user_3', role: 'resident',  status: 'approved', requestedAt: hours(48 * 10), reviewedAt: hours(48 * 9),  reviewedBy: 'user_2' },
 ]
 
 export const SERVICE_TYPES = [

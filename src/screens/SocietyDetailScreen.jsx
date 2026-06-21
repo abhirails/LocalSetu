@@ -1,9 +1,23 @@
-import { useState } from "react"
+// ============================================================
+// LocalSetu — SocietyDetailScreen (Phase 3)
+// Shows society info, notices, events.
+// Non-members see public posts only + "Request to Join" button.
+// Approved members see all posts up to their visibility tier.
+// ============================================================
+
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useApp } from "../context/AppContext"
+import { useApp } from '../context/AppContext'
 
 const TAB_NOTICE = 'notice'
 const TAB_EVENT  = 'event'
+
+const VISIBILITY_META = {
+  public:    { label: 'Public feed',    color: '#16a34a', bg: '#22c55e20', icon: '🌐' },
+  society:   { label: 'Members only',   color: '#2563eb', bg: '#3b82f620', icon: '🔒' },
+  committee: { label: 'Committee only', color: '#7c3aed', bg: '#8b5cf620', icon: '🛡️' },
+  admin:     { label: 'Admin only',     color: '#dc2626', bg: '#ef444420', icon: '👑' },
+}
 
 export default function SocietyDetailScreen() {
   const { id } = useParams()
@@ -12,16 +26,34 @@ export default function SocietyDetailScreen() {
 
   const [tab, setTab] = useState(TAB_NOTICE)
   const [showPostForm, setShowPostForm] = useState(false)
+  const [joinLoading, setJoinLoading] = useState(false)
 
   const society = helpers.getSociety(id)
-  const posts = helpers.getSocietyPosts(id)
+  const allPosts = helpers.getSocietyPosts(id)
 
-  const notices = posts.filter(p => p.type === 'notice')
-  const events  = posts.filter(p => p.type === 'event')
+  // Load members for this society when component mounts
+  useEffect(() => {
+    if (id) actions.loadSocietyMembers(id)
+  }, [id])
+
+  const membershipStatus = helpers.getMembershipStatus(id)   // null | 'pending' | 'approved' | 'rejected'
+  const memberRole       = helpers.getMemberRole(id)         // null | 'resident' | 'committee' | 'admin'
+  const isMember         = membershipStatus === 'approved'
+  const isPending        = membershipStatus === 'pending'
+
+  const isAdmin = helpers.isSocietyAdmin() && state.currentUser?.societyId === id
+
+  // Filter posts by what this user can see
+  const visiblePosts = allPosts.filter(p => helpers.canViewSocietyPost(p))
+  const notices = visiblePosts.filter(p => p.type === 'notice')
+  const events  = visiblePosts.filter(p => p.type === 'event')
   const displayed = tab === TAB_NOTICE ? notices : events
 
-  const isAdmin = helpers.isSocietyAdmin() &&
-    state.currentUser?.societyId === id
+  // Count locked posts (visible in count but not in content)
+  const lockedCount = allPosts.length - visiblePosts.length
+
+  const pendingCount  = helpers.getPendingMemberships(id).length
+  const approvedCount = helpers.getApprovedMemberships(id).length
 
   if (!society) {
     return (
@@ -42,6 +74,15 @@ export default function SocietyDetailScreen() {
       window.location.href = `tel:${society.contactPhone}`
     } else {
       alert('No contact number available. Ask your building secretary to update LocalSetu.')
+    }
+  }
+
+  const handleJoinRequest = async () => {
+    setJoinLoading(true)
+    try {
+      await actions.requestJoinSociety(id)
+    } finally {
+      setJoinLoading(false)
     }
   }
 
@@ -67,27 +108,75 @@ export default function SocietyDetailScreen() {
               {society.name}
             </h2>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-light)' }}>
-              {society.sector}
-              {society.landmark ? ` • ${society.landmark}` : ''}
+              {society.sector}{society.landmark ? ` • ${society.landmark}` : ''}
+              {approvedCount > 0 ? ` • ${approvedCount} members` : ''}
             </p>
           </div>
           {isAdmin && (
             <button
               onClick={() => navigate('/society-admin')}
               style={{
+                position: 'relative',
                 padding: '6px 12px', fontSize: 12, fontWeight: 600,
                 background: 'var(--primary)', color: '#fff',
                 border: 'none', borderRadius: 8, cursor: 'pointer'
               }}
             >
               Admin Panel
+              {pendingCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -6, right: -6,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: '#ef4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  {pendingCount}
+                </span>
+              )}
             </button>
           )}
         </div>
       </div>
 
+      {/* Membership status banner */}
+      {isMember && !isAdmin && (
+        <div style={{
+          margin: '10px 16px 0', padding: '8px 12px',
+          background: '#22c55e15', border: '1px solid #22c55e40',
+          borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          <span style={{ fontSize: 18 }}>
+            {memberRole === 'committee' ? '🛡️' : memberRole === 'admin' ? '👑' : '✅'}
+          </span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>
+              {memberRole === 'committee' ? 'Committee Member' : memberRole === 'admin' ? 'Society Admin' : 'Verified Resident'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-light)' }}>
+              You have access to members-only posts
+            </div>
+          </div>
+        </div>
+      )}
+      {isPending && (
+        <div style={{
+          margin: '10px 16px 0', padding: '8px 12px',
+          background: '#fef9c3', border: '1px solid #fde047',
+          borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          <span style={{ fontSize: 18 }}>⏳</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#a16207' }}>Join request pending</div>
+            <div style={{ fontSize: 11, color: '#a16207' }}>
+              Waiting for society admin approval
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Society info card */}
-      <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ padding: '12px 16px 0' }}>
         <div style={{
           background: 'var(--card-bg)',
           border: '1px solid var(--border)',
@@ -126,21 +215,60 @@ export default function SocietyDetailScreen() {
             </details>
           )}
 
-          <button
-            onClick={handleCall}
-            style={{
-              width: '100%', padding: '10px',
-              background: 'rgba(var(--primary-rgb, 255,107,53), 0.1)',
-              color: 'var(--primary)', border: '1px solid var(--primary)',
-              borderRadius: 10, cursor: 'pointer',
-              fontSize: 13.5, fontWeight: 600, display: 'flex',
-              alignItems: 'center', justifyContent: 'center', gap: 6
-            }}
-          >
-            📞 Contact Secretary
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleCall}
+              style={{
+                flex: 1, padding: '10px',
+                background: 'rgba(var(--primary-rgb, 255,107,53), 0.1)',
+                color: 'var(--primary)', border: '1px solid var(--primary)',
+                borderRadius: 10, cursor: 'pointer',
+                fontSize: 13.5, fontWeight: 600, display: 'flex',
+                alignItems: 'center', justifyContent: 'center', gap: 6
+              }}
+            >
+              📞 Contact Secretary
+            </button>
+            {/* Join request button */}
+            {!isMember && !isPending && !isAdmin && state.currentUser && (
+              <button
+                onClick={handleJoinRequest}
+                disabled={joinLoading}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: joinLoading ? 'var(--border)' : 'var(--primary)',
+                  color: '#fff', border: 'none',
+                  borderRadius: 10, cursor: joinLoading ? 'not-allowed' : 'pointer',
+                  fontSize: 13.5, fontWeight: 600
+                }}
+              >
+                {joinLoading ? 'Requesting…' : '🏠 Request to Join'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Locked content notice for non-members */}
+      {!isMember && !isAdmin && lockedCount > 0 && (
+        <div style={{
+          margin: '10px 16px 0', padding: '12px 14px',
+          background: '#f0f9ff', border: '1px solid #bae6fd',
+          borderRadius: 10
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>🔒</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0369a1' }}>
+                {lockedCount} members-only post{lockedCount !== 1 ? 's' : ''} not visible
+              </div>
+              <div style={{ fontSize: 11, color: '#0369a1' }}>
+                {isPending ? 'Your request is pending approval.' : 'Request to join to see them.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Safety note */}
       <div style={{
@@ -206,7 +334,7 @@ export default function SocietyDetailScreen() {
               {tab === TAB_NOTICE ? '📋' : '🎉'}
             </div>
             <p style={{ margin: 0, fontSize: 14 }}>
-              No active {tab === TAB_NOTICE ? 'notices' : 'events'}
+              No {isMember ? 'active' : 'public'} {tab === TAB_NOTICE ? 'notices' : 'events'}
             </p>
             {isAdmin && (
               <p style={{ margin: '4px 0 0', fontSize: 12 }}>
@@ -216,7 +344,7 @@ export default function SocietyDetailScreen() {
           </div>
         ) : (
           displayed.map(post => (
-            <SocietyPostCard key={post.id} post={post} />
+            <SocietyPostCard key={post.id} post={post} showVisibility={isMember || isAdmin} />
           ))
         )}
       </div>
@@ -226,6 +354,7 @@ export default function SocietyDetailScreen() {
         <SocietyPostForm
           type={tab}
           societyId={id}
+          showVisibility={isAdmin}
           onClose={() => setShowPostForm(false)}
           onSaved={() => setShowPostForm(false)}
         />
@@ -234,8 +363,9 @@ export default function SocietyDetailScreen() {
   )
 }
 
-function SocietyPostCard({ post }) {
+function SocietyPostCard({ post, showVisibility }) {
   const isEvent = post.type === 'event'
+  const visMeta = VISIBILITY_META[post.visibility || 'public']
 
   const formattedDate = (dateStr) => {
     if (!dateStr) return null
@@ -261,8 +391,8 @@ function SocietyPostCard({ post }) {
       border: '1px solid var(--border)',
       borderRadius: 14, padding: '14px 16px'
     }}>
-      {/* Type badge + time */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+      {/* Type badge + visibility + time */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 11, fontWeight: 700,
           padding: '2px 8px', borderRadius: 20,
@@ -271,7 +401,16 @@ function SocietyPostCard({ post }) {
         }}>
           {isEvent ? '🎉 Event' : '📋 Notice'}
         </span>
-        <span style={{ fontSize: 11.5, color: 'var(--text-light)' }}>
+        {showVisibility && post.visibility && post.visibility !== 'public' && (
+          <span style={{
+            fontSize: 11, fontWeight: 600,
+            padding: '2px 8px', borderRadius: 20,
+            background: visMeta.bg, color: visMeta.color
+          }}>
+            {visMeta.icon} {visMeta.label}
+          </span>
+        )}
+        <span style={{ fontSize: 11.5, color: 'var(--text-light)', marginLeft: 'auto' }}>
           {age(post.createdAt)}
         </span>
       </div>
@@ -309,13 +448,13 @@ function SocietyPostCard({ post }) {
   )
 }
 
-function SocietyPostForm({ type, societyId, onClose, onSaved }) {
-  const { state, actions } = useApp()
+function SocietyPostForm({ type, societyId, showVisibility, onClose, onSaved }) {
+  const { actions } = useApp()
   const [title, setTitle]             = useState('')
   const [content, setContent]         = useState('')
   const [eventDate, setEventDate]     = useState('')
   const [eventLocation, setEventLocation] = useState('')
-  const [pinToFeed, setPinToFeed]     = useState(true)
+  const [visibility, setVisibility]   = useState('public')
   const [saving, setSaving]           = useState(false)
   const [error, setError]             = useState('')
 
@@ -335,7 +474,8 @@ function SocietyPostForm({ type, societyId, onClose, onSaved }) {
         content: content.trim(),
         eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : null,
         eventLocation: isEvent ? eventLocation.trim() || null : null,
-        pinToFeed
+        visibility,
+        pinToFeed: visibility === 'public'
       })
       onSaved()
     } catch (err) {
@@ -382,9 +522,6 @@ function SocietyPostForm({ type, societyId, onClose, onSaved }) {
                 color: 'var(--text)', fontSize: 14, outline: 'none'
               }}
             />
-            <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-light)', textAlign: 'right' }}>
-              {title.length}/120
-            </p>
           </div>
 
           {isEvent && (
@@ -445,33 +582,61 @@ function SocietyPostForm({ type, societyId, onClose, onSaved }) {
                 resize: 'vertical', fontFamily: 'inherit'
               }}
             />
-            <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-light)', textAlign: 'right' }}>
-              {content.length}/500
-            </p>
           </div>
 
-          {/* Pin to main feed */}
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            cursor: 'pointer', padding: '10px 12px',
-            background: 'var(--card-bg)', border: '1px solid var(--border)',
-            borderRadius: 10
-          }}>
-            <input
-              type="checkbox"
-              checked={pinToFeed}
-              onChange={e => setPinToFeed(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
-            />
+          {/* Visibility selector (admin only) */}
+          {showVisibility && (
             <div>
-              <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>
-                Show in KhargharConnect feed
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-light)' }}>
-                Residents nearby will see this in their Home feed
-              </p>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
+                Who can see this?
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { value: 'public',    icon: '🌐', label: 'Public feed', sub: 'Visible to all nearby residents on the main feed' },
+                  { value: 'society',   icon: '🔒', label: 'Members only', sub: 'Only approved society members can see this' },
+                  { value: 'committee', icon: '🛡️', label: 'Committee only', sub: 'Only committee members and admin' },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      cursor: 'pointer', padding: '10px 12px',
+                      background: visibility === opt.value ? VISIBILITY_META[opt.value].bg : 'var(--card-bg)',
+                      border: `1.5px solid ${visibility === opt.value ? VISIBILITY_META[opt.value].color : 'var(--border)'}`,
+                      borderRadius: 10, transition: 'all 0.15s'
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value={opt.value}
+                      checked={visibility === opt.value}
+                      onChange={() => setVisibility(opt.value)}
+                      style={{ width: 16, height: 16, accentColor: VISIBILITY_META[opt.value].color }}
+                    />
+                    <span style={{ fontSize: 18 }}>{opt.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: visibility === opt.value ? VISIBILITY_META[opt.value].color : 'var(--text)' }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{opt.sub}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
-          </label>
+          )}
+
+          {/* Pin to feed toggle (public only) */}
+          {!showVisibility && (
+            <div style={{
+              padding: '10px 12px', background: '#f0f9ff',
+              border: '1px solid #bae6fd', borderRadius: 10,
+              fontSize: 13, color: '#0369a1'
+            }}>
+              🌐 This post will appear in the public KhargharConnect feed
+            </div>
+          )}
 
           {error && (
             <p style={{ margin: 0, fontSize: 13, color: '#ef4444', padding: '8px 12px',

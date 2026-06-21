@@ -329,26 +329,113 @@ CREATE POLICY "Users can unsave posts"
 
 -- ============================================================
 -- 11. SOCIETIES + SOCIETY POSTS (Phase 2)
+-- ================================================
+-- ============================================================
+-- PHASE 2.5 MIGRATION — Multi-Locality
+-- Run in Supabase SQL Editor if upgrading an existing database
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS public.societies (
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS saved_localities TEXT[]    NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS active_locality  TEXT;
+
+-- Index for locality queries
+CREATE INDEX IF NOT EXISTS idx_profiles_saved_localities
+  ON public.profiles USING gin(saved_localities);
+
+CREATE INDEX IF NOT EXISTS idx_posts_locality
+  ON public.posts(locality);
+
+-- ============================================================
+-- PHASE 3 MIGRATION — Private Resident Groups
+-- Run in Supabase SQL Editor if upgrading an existing database
+-- ============================================================
+
+-- 1. Visibility tier on society_posts
+--    'public'    → pinned to public feed (existing pin_to_feed=true posts)
+--    'society'   → approved members only
+--    'committee' → committee + admin only
+--    'admin'     → society admin only
+ALTER TABLE public.society_posts
+  ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'
+    CHECK (visibility IN ('public', 'society', 'committee', 'admin'));
+
+-- 2. Society members table
+CREATE TABLE IF NOT EXISTS public.society_members (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name          TEXT NOT NULL,
-  sector        TEXT NOT NULL,          -- e.g. "Sector 20"
-  landmark      TEXT,
-  description   TEXT,
-  rules         TEXT,
-  contact_phone TEXT,
-  total_flats   INTEGER,
-  admin_id      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  is_verified   BOOLEAN NOT NULL DEFAULT false,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  society_id    UUID NOT NULL REFERENCES public.societies(id) ON DELETE CASCADE,
+  user_id       UUID NOT NULL REFERENCES public.profiles(id)  ON DELETE CASCADE,
+  role          TEXT NOT NULL DEFAULT 'resident'
+                  CHECK (role IN ('resident', 'committee', 'admin')),
+  status        TEXT NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending', 'approved', 'rejected')),
+  requested_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at   TIMESTAMPTZ,
+  reviewed_by   UUID REFERENCES public.profiles(id),
+  UNIQUE(society_id, user_id)
 );
 
--- Now wire the FK from profiles.society_id
-ALTER TABLE public.profiles
-  ADD CONSTRAINT fk_profiles_society
-  FOREIGN KEY (society_id) REFERENCES public.societies(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_society_members_society ON public.society_members(society_id);
+CREATE INDEX IF NOT EXISTS idx_society_members_user    ON public.society_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_society_members_status  ON public.society_members(status);
+
+-- 3. RLS for society_members
+ALTER TABLE public.society_members ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can see membership records for their own society (society admins need full list)
+CREATE POLICY "Members can view society membership"
+  ON public.society_members FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'society_admin' AND society_id = society_members.society_id
+    )
+  );
+
+-- Residents can request to join
+CREATE POLICY "Users can request to join society"
+  ON public.society_members FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- Society admin can approve/reject (update status)
+CREATE POLICY "Society admin can review members"
+  ON public.society_members FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'society_admin' AND society_id = society_members.society_id
+    )
+  );
+
+-- 4. RLS for society_posts — members-only visibility gate
+--    Society admins see all. Approved members see 'society'. Committee+ see 'committee'. Public see 'public'.
+DROP POLICY IF EXISTS "Society posts visible to all" ON public.society_posts;
+
+CREATE POLICY "Society posts visibility gate"
+  ON public.society_posts FOR SELECT
+  USING (
+    visibility = 'public'
+    OR (
+      visibility = 'society'
+      AND EXISTS (
+        SELECT 1 FROM public.society_members
+        WHERE society_id = society_posts.society_id
+          AND user_id = auth.uid()
+          AND status = 'approved'
+      )
+    )
+    OR (
+      visibility IN ('committee', 'admin')
+      AND EXISTS (
+        SELECT 1 FROM public.society_members
+        WHERE society_id = society_posts.society_id
+          AND user_id = auth.uid()
+          AND status = 'approved'
+          AND role IN ('committee', 'admin')
+      )
+    )
+  );
 
 CREATE TABLE IF NOT EXISTS public.society_posts (
   id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,

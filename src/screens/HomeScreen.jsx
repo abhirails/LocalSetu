@@ -6,6 +6,7 @@ import { matchesLiveLocality, distanceMeters } from '../lib/geocode'
 import PostCard from '../components/PostCard'
 import ProviderCard from '../components/ProviderCard'
 import BottomNav from '../components/BottomNav'
+import LocalitySwitcherModal from '../components/LocalitySwitcherModal'
 
 const TABS = [
   { id: 'all', label: 'All' },
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const { state, actions, helpers } = useApp()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
+  const [showLocalitySwitcher, setShowLocalitySwitcher] = useState(false)
 
   const { locality: liveLocality, coords: liveCoords, status: locationStatus, requestLocation } = useCurrentLocation()
   const radiusFilter = state.radiusFilter
@@ -30,8 +32,27 @@ export default function HomeScreen() {
     }
   }, [liveLocality, liveCoords, locationStatus])
 
-  const rightNowPosts  = helpers.getActivePosts('right_now')
-  const needItNowPosts = helpers.getActivePosts('need_it_now')
+  // ── Active locality (multi-locality Phase 2.5) ──
+  const activeLocality = state.activeLocality  // null = Home, '__gps__' = GPS, string = saved
+  const effectiveLocality = activeLocality === '__gps__'
+    ? liveLocality
+    : activeLocality || state.currentUser?.locality || 'Kharghar'
+
+  const localityLabel = activeLocality === '__gps__'
+    ? (liveLocality ? `GPS: ${liveLocality}` : 'GPS')
+    : activeLocality || state.currentUser?.locality || 'Kharghar'
+
+  const isLocalityFiltered = !!activeLocality
+
+  // ── Locality-aware post filtering ──
+  const matchesActiveLocality = (post) => {
+    if (!isLocalityFiltered) return true
+    return matchesLiveLocality(post.locality, effectiveLocality)
+  }
+
+  const allActivePosts = helpers.getActivePosts
+  const rightNowPosts  = helpers.getActivePosts('right_now').filter(matchesActiveLocality)
+  const needItNowPosts = helpers.getActivePosts('need_it_now').filter(matchesActiveLocality)
   const providers = state.providers
     .filter(p => !helpers.isBlocked(p.id))
     .sort((a, b) => b.recommendationCount - a.recommendationCount)
@@ -61,8 +82,9 @@ export default function HomeScreen() {
     return [...filtered].sort((a, b) => {
       const aDist = getPostDistance(a)
       const bDist = getPostDistance(b)
-      const aNear = liveLocality ? matchesLiveLocality(a.locality, liveLocality) : false
-      const bNear = liveLocality ? matchesLiveLocality(b.locality, liveLocality) : false
+      const refLocality = effectiveLocality || liveLocality
+      const aNear = refLocality ? matchesLiveLocality(a.locality, refLocality) : false
+      const bNear = refLocality ? matchesLiveLocality(b.locality, refLocality) : false
       if (aDist !== null && bDist !== null) return aDist - bDist
       if (aNear && !bNear) return -1
       if (!aNear && bNear) return 1
@@ -202,9 +224,21 @@ export default function HomeScreen() {
         <div className="header">
           <div>
             <div className="header-logo">Local<span>Setu</span></div>
-            <div className="header-locality">
-              {liveLocality ? `${liveLocality}` : `${state.currentUser?.locality || 'Kharghar'}`}
-            </div>
+            <button
+              onClick={() => setShowLocalitySwitcher(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: isLocalityFiltered ? 'var(--primary)' : 'transparent',
+                color: isLocalityFiltered ? 'white' : 'var(--text-secondary)',
+                border: isLocalityFiltered ? 'none' : '1px solid var(--border-light)',
+                borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600,
+                marginTop: 2, cursor: 'pointer'
+              }}
+            >
+              <span>📍</span>
+              <span>{localityLabel}</span>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>▼</span>
+            </button>
           </div>
           <div className="header-actions">
             <button className="icon-btn" onClick={() => navigate('/profile')} title="Profile">Profile</button>
@@ -264,9 +298,25 @@ export default function HomeScreen() {
           </button>
         </div>
 
+        {/* Active locality filter banner */}
+        {isLocalityFiltered && (
+          <div style={{ background: 'var(--primary)', padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'white', fontWeight: 600, flex: 1 }}>
+              Showing posts from: <strong>{effectiveLocality}</strong>
+            </span>
+            <button
+              onClick={() => actions.setActiveLocality(null)}
+              style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 700, textDecoration: 'underline' }}
+            >
+              Show all
+            </button>
+          </div>
+        )}
+
         {renderFeed()}
       </div>
       <BottomNav />
+      {showLocalitySwitcher && <LocalitySwitcherModal onClose={() => setShowLocalitySwitcher(false)} />}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import * as db from '../lib/db'
-import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS } from '../data/demoData'
+import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS } from '../data/demoData'
 
 const AppContext = createContext(null)
 
@@ -30,10 +30,13 @@ function initDemoState() {
     savedPostIds: [],
     societies: DEMO_SOCIETIES,
     societyPosts: DEMO_SOCIETY_POSTS,
+    societyMembers: DEMO_SOCIETY_MEMBERS,
     liveLocality: null,
     liveCoords: null,
     locationStatus: 'idle',
     radiusFilter: null,
+    activeLocality: null,
+    savedLocalities: [],
     loading: false,
     toast: null
   }
@@ -202,12 +205,60 @@ function reducer(state, action) {
         )
       }
 
+    // ── Society Members (Phase 3) ──
+    case 'SET_SOCIETY_MEMBERS':
+      return { ...state, societyMembers: action.members }
+    case 'ADD_SOCIETY_MEMBER':
+      return { ...state, societyMembers: [action.member, ...state.societyMembers] }
+    case 'UPDATE_SOCIETY_MEMBER':
+      return {
+        ...state,
+        societyMembers: state.societyMembers.map(m =>
+          m.id === action.member.id ? { ...m, ...action.member } : m
+        )
+      }
+
     case 'SET_LIVE_LOCALITY':
       return { ...state, liveLocality: action.locality, liveCoords: action.coords || state.liveCoords, locationStatus: action.status || 'granted' }
     case 'SET_LOCATION_STATUS':
       return { ...state, locationStatus: action.status }
     case 'SET_RADIUS_FILTER':
       return { ...state, radiusFilter: action.radius }
+
+    // ── Multi-Locality ──
+    case 'SET_ACTIVE_LOCALITY':
+      return { ...state, activeLocality: action.locality }
+    case 'SET_SAVED_LOCALITIES':
+      return {
+        ...state,
+        savedLocalities: action.localities,
+        currentUser: state.currentUser
+          ? { ...state.currentUser, savedLocalities: action.localities }
+          : state.currentUser
+      }
+    case 'ADD_SAVED_LOCALITY': {
+      const current = state.savedLocalities || []
+      if (current.includes(action.locality) || current.length >= 2) return state
+      const updated = [...current, action.locality]
+      return {
+        ...state,
+        savedLocalities: updated,
+        currentUser: state.currentUser
+          ? { ...state.currentUser, savedLocalities: updated }
+          : state.currentUser
+      }
+    }
+    case 'REMOVE_SAVED_LOCALITY': {
+      const updated = (state.savedLocalities || []).filter(l => l !== action.locality)
+      return {
+        ...state,
+        savedLocalities: updated,
+        activeLocality: state.activeLocality === action.locality ? null : state.activeLocality,
+        currentUser: state.currentUser
+          ? { ...state.currentUser, savedLocalities: updated }
+          : state.currentUser
+      }
+    }
 
     // ── Toast ──
     case 'SET_TOAST':
@@ -227,7 +278,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, () =>
     isSupabaseConfigured
-      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, loading: true, toast: null }
+      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
       : initDemoState()
   )
 
@@ -259,14 +310,15 @@ export function AppProvider({ children }) {
 
     const loadData = async (userId) => {
       try {
-        const [profile, posts, providers, savedIds, reports, societies, feedSocietyPosts] = await Promise.all([
+        const [profile, posts, providers, savedIds, reports, societies, feedSocietyPosts, memberships] = await Promise.all([
           db.getProfile(userId),
           db.getPosts(),
           db.getProviders(),
           db.getSavedPostIds(userId),
           db.getReports().catch(() => []),
           db.getSocieties().catch(() => []),
-          db.getFeedSocietyPosts().catch(() => [])
+          db.getFeedSocietyPosts().catch(() => []),
+          db.getUserMemberships(userId).catch(() => [])
         ])
         dispatch({ type: 'SET_USER', user: { ...profile, savedPosts: savedIds } })
         dispatch({ type: 'SET_POSTS', posts })
@@ -275,6 +327,11 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_REPORTS', reports })
         dispatch({ type: 'SET_SOCIETIES', societies })
         feedSocietyPosts.forEach(p => dispatch({ type: 'ADD_SOCIETY_POST', post: p }))
+        dispatch({ type: 'SET_SOCIETY_MEMBERS', members: memberships })
+        // Restore saved localities from profile
+        if (profile.savedLocalities?.length) {
+          dispatch({ type: 'SET_SAVED_LOCALITIES', localities: profile.savedLocalities })
+        }
       } catch (err) {
         console.error('LocalSetu: failed to load data', err)
         dispatch({ type: 'SET_LOADING', value: false })
@@ -698,6 +755,67 @@ export function AppProvider({ children }) {
       }
     },
 
+    // ── SOCIETY MEMBERS (Phase 3) ──
+
+    requestJoinSociety: async (societyId) => {
+      const userId = state.currentUser?.id
+      if (!userId) return
+      // Optimistic
+      const optimistic = {
+        id: 'opt_mem_' + Date.now(),
+        societyId,
+        userId,
+        role: 'resident',
+        status: 'pending',
+        requestedAt: new Date().toISOString(),
+        reviewedAt: null,
+        reviewedBy: null,
+        profile: null
+      }
+      dispatch({ type: 'ADD_SOCIETY_MEMBER', member: optimistic })
+      toast('Join request sent! Waiting for approval.')
+
+      if (isSupabaseConfigured) {
+        try {
+          const real = await db.requestJoinSociety(userId, societyId)
+          dispatch({ type: 'UPDATE_SOCIETY_MEMBER', member: { ...optimistic, ...real } })
+        } catch (err) {
+          console.error('LocalSetu: requestJoinSociety failed', err)
+          // revert optimistic
+          dispatch({ type: 'SET_SOCIETY_MEMBERS', members: state.societyMembers })
+        }
+      }
+    },
+
+    loadSocietyMembers: async (societyId) => {
+      if (isSupabaseConfigured) {
+        try {
+          const members = await db.getSocietyMembers(societyId)
+          // Merge: replace members for this society, keep others
+          const others = state.societyMembers.filter(m => m.societyId !== societyId)
+          dispatch({ type: 'SET_SOCIETY_MEMBERS', members: [...others, ...members] })
+        } catch (err) {
+          console.error('LocalSetu: loadSocietyMembers failed', err)
+        }
+      }
+    },
+
+    approveSocietyMember: async (memberId) => {
+      dispatch({ type: 'UPDATE_SOCIETY_MEMBER', member: { id: memberId, status: 'approved', reviewedAt: new Date().toISOString() } })
+      toast('Member approved!')
+      if (isSupabaseConfigured) {
+        await db.approveSocietyMember(memberId, state.currentUser.id).catch(console.error)
+      }
+    },
+
+    rejectSocietyMember: async (memberId) => {
+      dispatch({ type: 'UPDATE_SOCIETY_MEMBER', member: { id: memberId, status: 'rejected', reviewedAt: new Date().toISOString() } })
+      toast('Request rejected.')
+      if (isSupabaseConfigured) {
+        await db.rejectSocietyMember(memberId, state.currentUser.id).catch(console.error)
+      }
+    },
+
     setLiveLocality: (locality, coords, status = 'granted') => {
       dispatch({ type: 'SET_LIVE_LOCALITY', locality, coords, status })
     },
@@ -709,11 +827,35 @@ export function AppProvider({ children }) {
     setRadiusFilter: (radius) => {
       dispatch({ type: 'SET_RADIUS_FILTER', radius })
     },
+
+    // ── Multi-Locality ──
+    setActiveLocality: (locality) => {
+      dispatch({ type: 'SET_ACTIVE_LOCALITY', locality })
+    },
+
+    addSavedLocality: async (locality) => {
+      const current = state.savedLocalities || []
+      if (current.includes(locality) || current.length >= 2) return
+      dispatch({ type: 'ADD_SAVED_LOCALITY', locality })
+      if (isSupabaseConfigured && state.currentUser) {
+        const updated = [...current, locality]
+        await db.updateSavedLocalities(state.currentUser.id, updated).catch(console.error)
+      }
+    },
+
+
+    emoveSavedLocality: async (locality) => {
+      dispatch({ type: 'REMOVE_SAVED_LOCALITY', locality })
+      if (isSupabaseConfigured && state.currentUser) {
+        const updated = (state.savedLocalities || []).filter(l => l !== locality)
+        await db.updateSavedLocalities(state.currentUser.id, updated).catch(console.error)
+      }
+    },
   }
 
   // ────────────────────────────────────────────────────────
   // HELPERS (derived queries, read-only)
-  // ────────────────────────────────────────────────────────
+  // ----------------------------------------------------
 
   const helpers = {
     getPost: (id) => state.posts.find(p => p.id === id),
@@ -751,7 +893,6 @@ export function AppProvider({ children }) {
     getFlaggedPosts: () =>
       state.posts.filter(p => p.status === 'flagged' || (p.reportCount || 0) >= 3),
 
-    // Society helpers
     getSociety: (id) => state.societies.find(s => s.id === id),
 
     getSocietyPosts: (societyId) =>
@@ -764,11 +905,52 @@ export function AppProvider({ children }) {
         .filter(p => p.pinToFeed && p.status === 'active')
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
 
-    isSocietyAdmin: () =>
-      state.currentUser?.role === 'society_admin',
+    isSocietyAdmin: () => state.currentUser?.role === 'society_admin',
 
-    getMySociety: () =>
-      state.societies.find(s => s.id === state.currentUser?.societyId),
+    getMySociety: () => state.societies.find(s => s.id === state.currentUser?.societyId),
+
+    // Phase 3 — membership helpers
+    getMembership: (societyId) =>
+      (state.societyMembers || []).find(
+        m => m.societyId === societyId && m.userId === state.currentUser?.id
+      ) || null,
+
+    getMembershipStatus: (societyId) => {
+      const m = (state.societyMembers || []).find(
+        x => x.societyId === societyId && x.userId === state.currentUser?.id
+      )
+      return m ? m.status : null
+    },
+
+    getMemberRole: (societyId) => {
+      const m = (state.societyMembers || []).find(
+        x => x.societyId === societyId && x.userId === state.currentUser?.id && x.status === 'approved'
+      )
+      return m ? m.role : null
+    },
+
+    canViewSocietyPost: (post) => {
+      if (!post) return false
+      const vis = post.visibility || 'public'
+      if (vis === 'public') return true
+      const m = (state.societyMembers || []).find(
+        x => x.societyId === post.societyId && x.userId === state.currentUser?.id && x.status === 'approved'
+      )
+      if (!m) return false
+      if (vis === 'society') return true
+      if (vis === 'committee') return m.role === 'committee' || m.role === 'admin'
+      if (vis === 'admin') return m.role === 'admin'
+      return false
+    },
+
+    getSocietyMembersList: (societyId) =>
+      (state.societyMembers || []).filter(m => m.societyId === societyId),
+
+    getPendingMemberships: (societyId) =>
+      (state.societyMembers || []).filter(m => m.societyId === societyId && m.status === 'pending'),
+
+    getApprovedMemberships: (societyId) =>
+      (state.societyMembers || []).filter(m => m.societyId === societyId && m.status === 'approved'),
   }
 
   return (

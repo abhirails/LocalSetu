@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext'
 import { useNotifications } from '../hooks/useNotifications'
 import PostCard from '../components/PostCard'
 import BottomNav from '../components/BottomNav'
+import LocalitySwitcherModal from '../components/LocalitySwitcherModal'
 
 function getInitials(name) {
   return name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?'
@@ -14,6 +15,7 @@ export default function ProfileScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('posts')
   const [showSettings, setShowSettings] = useState(false)
+  const [showLocalitySwitcher, setShowLocalitySwitcher] = useState(false)
 
   const cu = state.currentUser
   if (!cu) { navigate('/login'); return null }
@@ -34,6 +36,8 @@ export default function ProfileScreen() {
       navigate('/login')
     }
   }
+
+  const savedLocalities = state.savedLocalities || []
 
   return (
     <div className="app-container">
@@ -125,13 +129,50 @@ export default function ProfileScreen() {
                   <div className="menu-item-sub">{cu.name}</div>
                 </div>
               </div>
-              <div className="menu-item">
+
+              {/* Home locality — tappable to open switcher */}
+              <button className="menu-item" onClick={() => setShowLocalitySwitcher(true)}>
                 <div className="menu-item-icon">Pin</div>
                 <div className="menu-item-text">
-                  <div className="menu-item-label">Locality</div>
+                  <div className="menu-item-label">Home Locality</div>
                   <div className="menu-item-sub">{cu.locality}</div>
                 </div>
-              </div>
+                <div className="menu-item-arrow">+</div>
+              </button>
+
+              {/* Saved localities */}
+              {savedLocalities.length > 0 && (
+                <div className="menu-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                  <div className="menu-item-text" style={{ width: '100%' }}>
+                    <div className="menu-item-label">Saved Localities</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 4 }}>
+                    {savedLocalities.map(loc => (
+                      <div key={loc} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--primary-light)', borderRadius: 20, padding: '3px 10px', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                        <span>{loc}</span>
+                        <button onClick={() => actions.removeSavedLocality(loc)} style={{ fontSize: 14, color: 'var(--primary)', marginLeft: 2, lineHeight: 1 }}>x</button>
+                      </div>
+                    ))}
+                    {savedLocalities.length < 2 && (
+                      <button onClick={() => setShowLocalitySwitcher(true)} style={{ background: 'transparent', border: '1px dashed var(--primary)', borderRadius: 20, padding: '3px 10px', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {savedLocalities.length === 0 && (
+                <button className="menu-item" onClick={() => setShowLocalitySwitcher(true)}>
+                  <div className="menu-item-icon">+</div>
+                  <div className="menu-item-text">
+                    <div className="menu-item-label">Add saved locality</div>
+                    <div className="menu-item-sub">Pin your office, parents area, etc. (max 2)</div>
+                  </div>
+                  <div className="menu-item-arrow">+</div>
+                </button>
+              )}
+
               <div className="menu-item">
                 <div className="menu-item-icon">Phone</div>
                 <div className="menu-item-text">
@@ -147,6 +188,7 @@ export default function ProfileScreen() {
                 </div>
               </div>
             </div>
+
             <div style={{ padding: '0 14px', marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>
                 Privacy Settings
@@ -158,6 +200,7 @@ export default function ProfileScreen() {
                 Other users cannot see your phone unless you share it.
               </div>
             </div>
+
             <button className="btn btn-danger" style={{ margin: '0 14px 24px', width: 'calc(100% - 28px)' }} onClick={handleLogout}>
               Log out
             </button>
@@ -177,7 +220,17 @@ export default function ProfileScreen() {
                   <div className="menu-item-label">Privacy Settings</div>
                   <div className="menu-item-sub">Control what others see</div>
                 </div>
-                <div className="menu-item-arrow">›</div>
+                <div className="menu-item-arrow">+</div>
+              </button>
+              <button className="menu-item" onClick={() => { setShowSettings(false); setShowLocalitySwitcher(true) }}>
+                <div className="menu-item-icon">Pin</div>
+                <div className="menu-item-text">
+                  <div className="menu-item-label">My Localities</div>
+                  <div className="menu-item-sub">
+                    {savedLocalities.length > 0 ? `${cu.locality} + ${savedLocalities.length} saved` : cu.locality}
+                  </div>
+                </div>
+                <div className="menu-item-arrow">+</div>
               </button>
               <button className="menu-item"
                 onClick={async () => {
@@ -206,7 +259,7 @@ export default function ProfileScreen() {
                   <div className="menu-item-label">Report an Issue</div>
                   <div className="menu-item-sub">Contact support</div>
                 </div>
-                <div className="menu-item-arrow">›</div>
+                <div className="menu-item-arrow">+</div>
               </button>
               <button className="menu-item" onClick={() => { setShowSettings(false); handleLogout() }}>
                 <div className="menu-item-icon">Exit</div>
@@ -220,6 +273,7 @@ export default function ProfileScreen() {
       )}
 
       <BottomNav />
+      {showLocalitySwitcher && <LocalitySwitcherModal onClose={() => setShowLocalitySwitcher(false)} />}
     </div>
   )
 }

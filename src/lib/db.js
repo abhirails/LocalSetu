@@ -352,10 +352,23 @@ function normalizeProfile(p) {
     helpCount:    p.help_count,
     isWarned:     p.is_warned,
     isBanned:     p.is_banned,
-    blockedUsers: p.blocked_users || [],
-    savedPosts:   [],           // loaded separately
-    joinedAt:     p.created_at
+    blockedUsers:      p.blocked_users || [],
+    savedPosts:        [],           // loaded separately
+    savedLocalities:   p.saved_localities || [],
+    activeLocality:    p.active_locality || null,
+    joinedAt:          p.created_at
   }
+}
+
+export async function updateSavedLocalities(userId, savedLocalities) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ saved_localities: savedLocalities, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeProfile(data)
 }
 
 function normalizePost(p) {
@@ -451,6 +464,7 @@ export function normalizeSocietyPost(p) {
     eventLocation: p.event_location,
     status:        p.status,
     pinToFeed:     p.pin_to_feed,
+    visibility:    p.visibility || 'public',
     createdAt:     p.created_at,
     society:       p.societies ? normalizeSociety(p.societies) : null
   }
@@ -488,6 +502,7 @@ export async function getSocietyPosts(societyId) {
 }
 
 export async function createSocietyPost(societyId, userId, postData) {
+  const visibility = postData.visibility || 'public'
   const { data, error } = await supabase
     .from('society_posts')
     .insert({
@@ -499,7 +514,8 @@ export async function createSocietyPost(societyId, userId, postData) {
       event_date:     postData.eventDate || null,
       event_location: postData.eventLocation || null,
       status:         'active',
-      pin_to_feed:    postData.pinToFeed || false
+      pin_to_feed:    visibility === 'public' ? (postData.pinToFeed ?? true) : false,
+      visibility
     })
     .select()
     .single()
@@ -509,8 +525,9 @@ export async function createSocietyPost(societyId, userId, postData) {
 
 export async function updateSocietyPost(id, updates) {
   const dbUpdates = {}
-  if (updates.status !== undefined)   dbUpdates.status = updates.status
+  if (updates.status !== undefined)    dbUpdates.status = updates.status
   if (updates.pinToFeed !== undefined) dbUpdates.pin_to_feed = updates.pinToFeed
+  if (updates.visibility !== undefined) dbUpdates.visibility = updates.visibility
   const { data, error } = await supabase
     .from('society_posts')
     .update(dbUpdates)
@@ -519,4 +536,74 @@ export async function updateSocietyPost(id, updates) {
     .single()
   if (error) throw error
   return normalizeSocietyPost(data)
+}
+
+// ────────────────────────────────────────────────────────────
+// SOCIETY MEMBERS (Phase 3)
+// ────────────────────────────────────────────────────────────
+
+export function normalizeMember(m) {
+  if (!m) return null
+  return {
+    id:          m.id,
+    societyId:   m.society_id,
+    userId:      m.user_id,
+    role:        m.role,
+    status:      m.status,
+    requestedAt: m.requested_at,
+    reviewedAt:  m.reviewed_at,
+    reviewedBy:  m.reviewed_by,
+    profile:     m.profiles ? normalizeProfile(m.profiles) : null
+  }
+}
+
+export async function getSocietyMembers(societyId) {
+  const { data, error } = await supabase
+    .from('society_members')
+    .select('*, profiles(id, name, locality, is_verified, trust_score)')
+    .eq('society_id', societyId)
+    .order('requested_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map(normalizeMember)
+}
+
+export async function getUserMemberships(userId) {
+  const { data, error } = await supabase
+    .from('society_members')
+    .select('*')
+    .eq('user_id', userId)
+  if (error) throw error
+  return (data || []).map(normalizeMember)
+}
+
+export async function requestJoinSociety(userId, societyId) {
+  const { data, error } = await supabase
+    .from('society_members')
+    .insert({ user_id: userId, society_id: societyId, status: 'pending', role: 'resident' })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeMember(data)
+}
+
+export async function approveSocietyMember(memberId, reviewedById) {
+  const { data, error } = await supabase
+    .from('society_members')
+    .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: reviewedById })
+    .eq('id', memberId)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeMember(data)
+}
+
+export async function rejectSocietyMember(memberId, reviewedById) {
+  const { data, error } = await supabase
+    .from('society_members')
+    .update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: reviewedById })
+    .eq('id', memberId)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeMember(data)
 }

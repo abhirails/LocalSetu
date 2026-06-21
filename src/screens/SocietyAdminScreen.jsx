@@ -1,22 +1,41 @@
-import { useState } from "react"
+// ============================================================
+// LocalSetu — SocietyAdminScreen (Phase 3)
+// Society admin panel: post notices/events, manage members.
+// Tabs: Active posts | Resolved posts | Members (pending/approved)
+// ============================================================
+
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useApp } from "../context/AppContext"
+import { useApp } from '../context/AppContext'
 
 const TAB_ACTIVE   = 'active'
 const TAB_RESOLVED = 'resolved'
+const TAB_MEMBERS  = 'members'
+
+const VISIBILITY_META = {
+  public:    { label: 'Public feed',    color: '#16a34a', bg: '#22c55e20', icon: '🌐' },
+  society:   { label: 'Members only',   color: '#2563eb', bg: '#3b82f620', icon: '🔒' },
+  committee: { label: 'Committee only', color: '#7c3aed', bg: '#8b5cf620', icon: '🛡️' },
+  admin:     { label: 'Admin only',     color: '#dc2626', bg: '#ef444420', icon: '👑' },
+}
 
 export default function SocietyAdminScreen() {
   const { state, actions, helpers } = useApp()
   const navigate = useNavigate()
-  const [tab, setTab]             = useState(TAB_ACTIVE)
+  const [tab, setTab]                   = useState(TAB_ACTIVE)
   const [showPostForm, setShowPostForm] = useState(false)
-  const [postType, setPostType]   = useState('notice')
+  const [postType, setPostType]         = useState('notice')
   const [actionLoading, setActionLoading] = useState(null)
+  const [memberTab, setMemberTab]       = useState('pending') // 'pending' | 'approved'
 
   const society = helpers.getMySociety()
   const isAdmin = helpers.isSocietyAdmin()
 
-  // Redirect if not a society admin
+  // Load members when component mounts
+  useEffect(() => {
+    if (society?.id) actions.loadSocietyMembers(society.id)
+  }, [society?.id])
+
   if (!isAdmin || !society) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-light)' }}>
@@ -36,12 +55,12 @@ export default function SocietyAdminScreen() {
     )
   }
 
-  const allPosts = (state.societyPosts || []).filter(
-    p => p.societyId === society.id
-  )
+  const allPosts = (state.societyPosts || []).filter(p => p.societyId === society.id)
   const activePosts   = allPosts.filter(p => p.status === 'active')
   const resolvedPosts = allPosts.filter(p => p.status === 'resolved')
-  const displayed = tab === TAB_ACTIVE ? activePosts : resolvedPosts
+
+  const pendingMembers  = helpers.getPendingMemberships(society.id)
+  const approvedMembers = helpers.getApprovedMemberships(society.id)
 
   const handleResolve = async (post) => {
     setActionLoading(post.id + '_resolve')
@@ -62,10 +81,31 @@ export default function SocietyAdminScreen() {
     }
   }
 
+  const handleApprove = async (memberId) => {
+    setActionLoading(memberId + '_approve')
+    try {
+      await actions.approveSocietyMember(memberId)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleReject = async (memberId) => {
+    setActionLoading(memberId + '_reject')
+    try {
+      await actions.rejectSocietyMember(memberId)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const openPostForm = (type) => {
     setPostType(type)
     setShowPostForm(true)
   }
+
+  // Which posts to show in the active/resolved tabs
+  const displayedPosts = tab === TAB_ACTIVE ? activePosts : resolvedPosts
 
   return (
     <div style={{ paddingBottom: 80 }}>
@@ -95,19 +135,25 @@ export default function SocietyAdminScreen() {
       </div>
 
       {/* Stats row */}
-      <div style={{
-        display: 'flex', gap: 10, padding: '14px 16px 0'
-      }}>
+      <div style={{ display: 'flex', gap: 8, padding: '14px 16px 0', flexWrap: 'wrap' }}>
         {[
-          { label: 'Active', count: activePosts.length, color: '#22c55e', bg: '#22c55e20' },
+          { label: 'Active',   count: activePosts.length,   color: '#16a34a', bg: '#22c55e20' },
           { label: 'Resolved', count: resolvedPosts.length, color: '#6366f1', bg: '#6366f120' },
-          { label: 'Total Flats', count: society.totalFlats || '—', color: 'var(--primary)', bg: 'rgba(var(--primary-rgb,255,107,53),0.1)' }
+          { label: 'Members',  count: approvedMembers.length, color: 'var(--primary)', bg: 'rgba(var(--primary-rgb,255,107,53),0.1)' },
+          { label: 'Pending',  count: pendingMembers.length, color: '#d97706', bg: '#fef9c320', alert: pendingMembers.length > 0 },
         ].map(s => (
-          <div key={s.label} style={{
-            flex: 1, background: s.bg,
-            borderRadius: 12, padding: '10px 8px', textAlign: 'center'
-          }}>
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: s.color }}>
+          <div
+            key={s.label}
+            onClick={s.label === 'Pending' || s.label === 'Members' ? () => setTab(TAB_MEMBERS) : undefined}
+            style={{
+              flex: '1 1 calc(25% - 8px)', minWidth: 64,
+              background: s.alert && s.count > 0 ? '#fef9c3' : s.bg,
+              border: s.alert && s.count > 0 ? '1.5px solid #fde047' : 'none',
+              borderRadius: 12, padding: '10px 8px', textAlign: 'center',
+              cursor: (s.label === 'Pending' || s.label === 'Members') ? 'pointer' : 'default'
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: s.alert && s.count > 0 ? '#d97706' : s.color }}>
               {s.count}
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-light)' }}>
@@ -117,33 +163,35 @@ export default function SocietyAdminScreen() {
         ))}
       </div>
 
-      {/* Post buttons */}
-      <div style={{ display: 'flex', gap: 10, padding: '14px 16px 0' }}>
-        <button
-          onClick={() => openPostForm('notice')}
-          style={{
-            flex: 1, padding: '11px 8px',
-            background: 'rgba(234,179,8,0.1)',
-            color: '#a16207', border: '1px solid rgba(234,179,8,0.4)',
-            borderRadius: 10, cursor: 'pointer',
-            fontSize: 13.5, fontWeight: 700
-          }}
-        >
-          📋 Post Notice
-        </button>
-        <button
-          onClick={() => openPostForm('event')}
-          style={{
-            flex: 1, padding: '11px 8px',
-            background: 'rgba(99,102,241,0.1)',
-            color: '#4338ca', border: '1px solid rgba(99,102,241,0.4)',
-            borderRadius: 10, cursor: 'pointer',
-            fontSize: 13.5, fontWeight: 700
-          }}
-        >
-          🎉 Post Event
-        </button>
-      </div>
+      {/* Post buttons — only shown on posts tabs */}
+      {tab !== TAB_MEMBERS && (
+        <div style={{ display: 'flex', gap: 10, padding: '14px 16px 0' }}>
+          <button
+            onClick={() => openPostForm('notice')}
+            style={{
+              flex: 1, padding: '11px 8px',
+              background: 'rgba(234,179,8,0.1)',
+              color: '#a16207', border: '1px solid rgba(234,179,8,0.4)',
+              borderRadius: 10, cursor: 'pointer',
+              fontSize: 13.5, fontWeight: 700
+            }}
+          >
+            📋 Post Notice
+          </button>
+          <button
+            onClick={() => openPostForm('event')}
+            style={{
+              flex: 1, padding: '11px 8px',
+              background: 'rgba(99,102,241,0.1)',
+              color: '#4338ca', border: '1px solid rgba(99,102,241,0.4)',
+              borderRadius: 10, cursor: 'pointer',
+              fontSize: 13.5, fontWeight: 700
+            }}
+          >
+            🎉 Post Event
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ padding: '14px 16px 0' }}>
@@ -154,7 +202,13 @@ export default function SocietyAdminScreen() {
         }}>
           {[
             { key: TAB_ACTIVE,   label: `Active (${activePosts.length})` },
-            { key: TAB_RESOLVED, label: `Resolved (${resolvedPosts.length})` }
+            { key: TAB_RESOLVED, label: `Resolved (${resolvedPosts.length})` },
+            {
+              key: TAB_MEMBERS,
+              label: pendingMembers.length > 0
+                ? `Members 🔴${pendingMembers.length}`
+                : `Members (${approvedMembers.length})`
+            }
           ].map(t => (
             <button
               key={t.key}
@@ -162,7 +216,7 @@ export default function SocietyAdminScreen() {
               style={{
                 flex: 1, padding: '10px 4px',
                 border: 'none', cursor: 'pointer',
-                fontSize: 13.5, fontWeight: tab === t.key ? 700 : 400,
+                fontSize: 12.5, fontWeight: tab === t.key ? 700 : 400,
                 background: tab === t.key ? 'var(--primary)' : 'transparent',
                 color: tab === t.key ? '#fff' : 'var(--text-light)',
                 transition: 'all 0.15s'
@@ -175,27 +229,107 @@ export default function SocietyAdminScreen() {
       </div>
 
       {/* Posts list */}
-      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {displayed.length === 0 ? (
-          <div style={{ textAlign: 'center', paddingTop: 32, color: 'var(--text-light)' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
-            <p style={{ margin: 0, fontSize: 14 }}>
-              No {tab} posts
-            </p>
+      {tab !== TAB_MEMBERS && (
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {displayedPosts.length === 0 ? (
+            <div style={{ textAlign: 'center', paddingTop: 32, color: 'var(--text-light)' }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
+              <p style={{ margin: 0, fontSize: 14 }}>No {tab} posts</p>
+            </div>
+          ) : (
+            displayedPosts.map(post => (
+              <AdminPostCard
+                key={post.id}
+                post={post}
+                onResolve={() => handleResolve(post)}
+                onRemove={() => handleRemove(post)}
+                resolveLoading={actionLoading === post.id + '_resolve'}
+                removeLoading={actionLoading === post.id + '_remove'}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Members tab */}
+      {tab === TAB_MEMBERS && (
+        <div style={{ padding: '12px 16px' }}>
+          {/* Sub-tabs: Pending / Approved */}
+          <div style={{
+            display: 'flex', gap: 0, marginBottom: 12,
+            border: '1px solid var(--border)', borderRadius: 8,
+            overflow: 'hidden', background: 'var(--card-bg)'
+          }}>
+            {[
+              { key: 'pending',  label: `Pending (${pendingMembers.length})` },
+              { key: 'approved', label: `Approved (${approvedMembers.length})` },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setMemberTab(t.key)}
+                style={{
+                  flex: 1, padding: '8px 4px',
+                  border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: memberTab === t.key ? 700 : 400,
+                  background: memberTab === t.key ? 'var(--primary)' : 'transparent',
+                  color: memberTab === t.key ? '#fff' : 'var(--text-light)',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        ) : (
-          displayed.map(post => (
-            <AdminPostCard
-              key={post.id}
-              post={post}
-              onResolve={() => handleResolve(post)}
-              onRemove={() => handleRemove(post)}
-              resolveLoading={actionLoading === post.id + '_resolve'}
-              removeLoading={actionLoading === post.id + '_remove'}
-            />
-          ))
-        )}
-      </div>
+
+          {/* Pending requests */}
+          {memberTab === 'pending' && (
+            pendingMembers.length === 0 ? (
+              <div style={{ textAlign: 'center', paddingTop: 32, color: 'var(--text-light)' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+                <p style={{ margin: 0, fontSize: 14 }}>No pending requests</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12 }}>All join requests have been reviewed</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {pendingMembers.map(member => (
+                  <MemberCard
+                    key={member.id}
+                    member={member}
+                    isPending={true}
+                    approveLoading={actionLoading === member.id + '_approve'}
+                    rejectLoading={actionLoading === member.id + '_reject'}
+                    onApprove={() => handleApprove(member.id)}
+                    onReject={() => handleReject(member.id)}
+                  />
+                ))}
+              </div>
+            )
+          )}
+
+          {/* Approved members */}
+          {memberTab === 'approved' && (
+            approvedMembers.length === 0 ? (
+              <div style={{ textAlign: 'center', paddingTop: 32, color: 'var(--text-light)' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🏠</div>
+                <p style={{ margin: 0, fontSize: 14 }}>No approved members yet</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12 }}>
+                  Approve pending requests to build your member list
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {approvedMembers.map(member => (
+                  <MemberCard
+                    key={member.id}
+                    member={member}
+                    isPending={false}
+                  />
+                ))}
+              </div>
+            )
+          )}
+        </div>
+      )}
 
       {/* Post form modal */}
       {showPostForm && (
@@ -210,9 +344,12 @@ export default function SocietyAdminScreen() {
   )
 }
 
+// ── Admin Post Card ──────────────────────────────────────────
+
 function AdminPostCard({ post, onResolve, onRemove, resolveLoading, removeLoading }) {
-  const isEvent = post.type === 'event'
+  const isEvent  = post.type === 'event'
   const isActive = post.status === 'active'
+  const visMeta  = VISIBILITY_META[post.visibility || 'public']
 
   const age = (dateStr) => {
     const diff = Date.now() - new Date(dateStr).getTime()
@@ -229,7 +366,6 @@ function AdminPostCard({ post, onResolve, onRemove, resolveLoading, removeLoadin
       border: '1px solid var(--border)',
       borderRadius: 14, padding: '14px 16px'
     }}>
-      {/* Type + pin badge + time */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 11, fontWeight: 700,
@@ -238,6 +374,13 @@ function AdminPostCard({ post, onResolve, onRemove, resolveLoading, removeLoadin
           color: isEvent ? '#4338ca' : '#a16207'
         }}>
           {isEvent ? '🎉 Event' : '📋 Notice'}
+        </span>
+        <span style={{
+          fontSize: 11, fontWeight: 600,
+          padding: '2px 8px', borderRadius: 20,
+          background: visMeta.bg, color: visMeta.color
+        }}>
+          {visMeta.icon} {visMeta.label}
         </span>
         {post.pinToFeed && isActive && (
           <span style={{
@@ -254,12 +397,10 @@ function AdminPostCard({ post, onResolve, onRemove, resolveLoading, removeLoadin
         </span>
       </div>
 
-      {/* Title */}
       <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 }}>
         {post.title}
       </h3>
 
-      {/* Content */}
       <p style={{
         margin: '0 0 12px', fontSize: 13, color: 'var(--text)',
         lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3,
@@ -268,7 +409,6 @@ function AdminPostCard({ post, onResolve, onRemove, resolveLoading, removeLoadin
         {post.content}
       </p>
 
-      {/* Actions */}
       {isActive && (
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -312,13 +452,128 @@ function AdminPostCard({ post, onResolve, onRemove, resolveLoading, removeLoadin
   )
 }
 
+// ── Member Card ──────────────────────────────────────────────
+
+function MemberCard({ member, isPending, approveLoading, rejectLoading, onApprove, onReject }) {
+  const name     = member.profile?.name || 'Resident'
+  const locality = member.profile?.locality || ''
+  const verified = member.profile?.isVerified
+
+  const roleMeta = {
+    resident:  { label: 'Resident',  color: '#2563eb', bg: '#3b82f620' },
+    committee: { label: 'Committee', color: '#7c3aed', bg: '#8b5cf620' },
+    admin:     { label: 'Admin',     color: '#dc2626', bg: '#ef444420' },
+  }[member.role] || { label: member.role, color: 'var(--text-muted)', bg: 'var(--bg)' }
+
+  const age = (dateStr) => {
+    if (!dateStr) return ''
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const hrs = Math.floor(diff / 3600000)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.floor(hrs / 24)}d ago`
+  }
+
+  return (
+    <div style={{
+      border: isPending ? '1.5px solid #fde047' : '1px solid var(--border)',
+      borderRadius: 12, padding: '12px 14px',
+      background: isPending ? '#fefce8' : 'var(--card-bg)'
+    }}>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Avatar */}
+        <div style={{
+          width: 40, height: 40, borderRadius: '50%',
+          background: 'var(--primary)', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, fontWeight: 700, flexShrink: 0
+        }}>
+          {name.charAt(0).toUpperCase()}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{name}</span>
+            {verified && (
+              <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>✓ Verified</span>
+            )}
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20,
+              background: roleMeta.bg, color: roleMeta.color
+            }}>
+              {roleMeta.label}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>
+            {locality && `📍 ${locality}`}
+            {member.requestedAt && (
+              <span style={{ marginLeft: locality ? 8 : 0 }}>
+                Requested {age(member.requestedAt)}
+              </span>
+            )}
+            {!isPending && member.reviewedAt && (
+              <span style={{ marginLeft: locality || member.requestedAt ? 8 : 0 }}>
+                Joined {age(member.reviewedAt)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Status badge for approved */}
+        {!isPending && (
+          <span style={{
+            fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
+            background: '#22c55e20', color: '#16a34a', flexShrink: 0
+          }}>
+            ✓ Approved
+          </span>
+        )}
+      </div>
+
+      {/* Approve / Reject buttons */}
+      {isPending && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button
+            onClick={onApprove}
+            disabled={approveLoading}
+            style={{
+              flex: 1, padding: '9px 4px',
+              background: approveLoading ? 'var(--border)' : '#22c55e',
+              color: '#fff', border: 'none',
+              borderRadius: 8, cursor: approveLoading ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 700
+            }}
+          >
+            {approveLoading ? '…' : '✓ Approve'}
+          </button>
+          <button
+            onClick={onReject}
+            disabled={rejectLoading}
+            style={{
+              flex: 1, padding: '9px 4px',
+              background: '#ef444420', color: '#dc2626',
+              border: '1px solid #ef444440',
+              borderRadius: 8, cursor: rejectLoading ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 600
+            }}
+          >
+            {rejectLoading ? '…' : '✕ Reject'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Admin Post Form (with visibility picker) ─────────────────
+
 function AdminPostForm({ type, societyId, onClose, onSaved }) {
-  const { state, actions } = useApp()
+  const { actions } = useApp()
   const [title, setTitle]                 = useState('')
   const [content, setContent]             = useState('')
   const [eventDate, setEventDate]         = useState('')
   const [eventLocation, setEventLocation] = useState('')
-  const [pinToFeed, setPinToFeed]         = useState(true)
+  const [visibility, setVisibility]       = useState('public')
   const [saving, setSaving]               = useState(false)
   const [error, setError]                 = useState('')
 
@@ -338,7 +593,8 @@ function AdminPostForm({ type, societyId, onClose, onSaved }) {
         content: content.trim(),
         eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : null,
         eventLocation: isEvent ? eventLocation.trim() || null : null,
-        pinToFeed
+        visibility,
+        pinToFeed: visibility === 'public'
       })
       onSaved()
     } catch (err) {
@@ -453,27 +709,49 @@ function AdminPostForm({ type, societyId, onClose, onSaved }) {
             </p>
           </div>
 
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            cursor: 'pointer', padding: '10px 12px',
-            background: 'var(--card-bg)', border: '1px solid var(--border)',
-            borderRadius: 10
-          }}>
-            <input
-              type="checkbox"
-              checked={pinToFeed}
-              onChange={e => setPinToFeed(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
-            />
-            <div>
-              <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>
-                Show in KhargharConnect feed
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-light)' }}>
-                Residents nearby will see this in their Home feed
-              </p>
+          {/* Visibility selector */}
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
+              Who can see this?
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { value: 'public',    icon: '🌐', label: 'Public feed',    sub: 'All nearby residents see this in the main feed' },
+                { value: 'society',   icon: '🔒', label: 'Members only',   sub: 'Only approved society members' },
+                { value: 'committee', icon: '🛡️', label: 'Committee only', sub: 'Committee members and admin only' },
+              ].map(opt => {
+                const meta = VISIBILITY_META[opt.value]
+                return (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      cursor: 'pointer', padding: '10px 12px',
+                      background: visibility === opt.value ? meta.bg : 'var(--card-bg)',
+                      border: `1.5px solid ${visibility === opt.value ? meta.color : 'var(--border)'}`,
+                      borderRadius: 10, transition: 'all 0.15s'
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value={opt.value}
+                      checked={visibility === opt.value}
+                      onChange={() => setVisibility(opt.value)}
+                      style={{ width: 16, height: 16, accentColor: meta.color }}
+                    />
+                    <span style={{ fontSize: 18 }}>{opt.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: visibility === opt.value ? meta.color : 'var(--text)' }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{opt.sub}</div>
+                    </div>
+                  </label>
+                )
+              })}
             </div>
-          </label>
+          </div>
 
           {error && (
             <p style={{ margin: 0, fontSize: 13, color: '#ef4444', padding: '8px 12px',
