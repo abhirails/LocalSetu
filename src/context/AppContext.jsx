@@ -28,6 +28,8 @@ function initDemoState() {
     replies: DEMO_REPLIES,
     reports: DEMO_REPORTS,
     savedPostIds: [],
+    liveLocality: null,
+    locationStatus: 'idle',
     loading: false,
     toast: null
   }
@@ -174,6 +176,12 @@ function reducer(state, action) {
     case 'ADMIN_WARN_USER':
       return { ...state, users: (state.users || []).map(u => u.id === action.userId ? { ...u, isWarned: true } : u) }
 
+    // ── Live Location ──
+    case 'SET_LIVE_LOCALITY':
+      return { ...state, liveLocality: action.locality, locationStatus: action.status || 'granted' }
+    case 'SET_LOCATION_STATUS':
+      return { ...state, locationStatus: action.status }
+
     // ── Toast ──
     case 'SET_TOAST':
       return { ...state, toast: action.message }
@@ -192,7 +200,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, () =>
     isSupabaseConfigured
-      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], loading: true, toast: null }
+      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], liveLocality: null, locationStatus: 'idle', loading: true, toast: null }
       : initDemoState()
   )
 
@@ -588,6 +596,14 @@ export function AppProvider({ children }) {
     adminBanUser: (userId) => {
       dispatch({ type: 'ADMIN_BAN_USER', userId })
       toast('User banned.')
+    },
+
+    setLiveLocality: (locality, status = 'granted') => {
+      dispatch({ type: 'SET_LIVE_LOCALITY', locality, status })
+    },
+
+    setLocationStatus: (status) => {
+      dispatch({ type: 'SET_LOCATION_STATUS', status })
     },
 
     adminResolveReport: async (reportId) => {

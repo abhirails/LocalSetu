@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { matchesLiveLocality } from '../lib/geocode'
 import CategoryBadge from './CategoryBadge'
 import { CATEGORY_META } from '../data/demoData'
 
@@ -37,6 +38,7 @@ export default function PostCard({ post, compact = false }) {
   const replyCount = helpers.getReplies(post.id).length
   const isMyPost = state.currentUser?.id === post.userId
   const alreadyConfirmed = post.confirmedBy?.includes(state.currentUser?.id)
+  const isNearby = matchesLiveLocality(post.locality, state.liveLocality)
 
   if (post.status === 'removed') return null
 
@@ -72,11 +74,17 @@ export default function PostCard({ post, compact = false }) {
   return (
     <>
       <div className="post-card" onClick={goToDetail} style={{ cursor: 'pointer' }}>
-        {/* Header */}
         <div className="post-card-header">
           <div className="post-avatar">{getInitials(author?.name)}</div>
           <div className="post-meta">
-            <div className="post-name">{author?.name || 'Local Resident'}</div>
+            <div className="post-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {author?.name || 'Local Resident'}
+              {isNearby && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#15803D', background: '#DCFCE7', borderRadius: 4, padding: '1px 5px', letterSpacing: 0.2 }}>
+                  📍 Near you
+                </span>
+              )}
+            </div>
             <div className="post-sub-meta">
               <span className="post-locality">📍 {post.locality}</span>
               <span className="post-dot" />
@@ -92,10 +100,8 @@ export default function PostCard({ post, compact = false }) {
           <CategoryBadge category={post.category} size="xs" />
         </div>
 
-        {/* Content */}
         <p className="post-content">{post.content}</p>
 
-        {/* Tags */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
           <span className="post-expiry">⏱ {timeUntil(post.expiresAt)}</span>
           {post.isFulfilled && <span className="tag-fulfilled">✅ Fulfilled</span>}
@@ -111,7 +117,6 @@ export default function PostCard({ post, compact = false }) {
           )}
         </div>
 
-        {/* Actions */}
         <div className="post-actions" onClick={e => e.stopPropagation()}>
           {post.type === 'right_now' && (
             <button
@@ -144,39 +149,24 @@ export default function PostCard({ post, compact = false }) {
 
           <div className="action-spacer" />
 
-          <button
-            className={`action-icon-btn ${isSaved ? 'saved' : ''}`}
-            onClick={handleSave}
-            title={isSaved ? 'Unsave' : 'Save'}
-          >
+          <button className={`action-icon-btn ${isSaved ? 'saved' : ''}`} onClick={handleSave} title={isSaved ? 'Unsave' : 'Save'}>
             {isSaved ? '🔖' : '📌'}
           </button>
 
           {!isMyPost && (
-            <button
-              className="action-icon-btn"
-              onClick={handleReport}
-              title="Report"
-              style={{ fontSize: 14 }}
-            >
+            <button className="action-icon-btn" onClick={handleReport} title="Report" style={{ fontSize: 14 }}>
               🚩
             </button>
           )}
 
           {isMyPost && post.type === 'need_it_now' && !post.isFulfilled && (
-            <button
-              className="action-icon-btn"
-              onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }}
-              title="Mark fulfilled"
-              style={{ fontSize: 14 }}
-            >
+            <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }} title="Mark fulfilled" style={{ fontSize: 14 }}>
               ✅
             </button>
           )}
         </div>
       </div>
 
-      {/* Report Modal */}
       {showReport && (
         <div className="overlay" onClick={() => setShowReport(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -190,12 +180,7 @@ export default function PostCard({ post, compact = false }) {
                 { id: 'wrong_category', label: '🏷️ Wrong category' },
                 { id: 'other', label: '📋 Other reason' }
               ].map(r => (
-                <button
-                  key={r.id}
-                  className="demo-user-btn"
-                  onClick={() => submitReport(r.id)}
-                  style={{ padding: '12px 14px' }}
-                >
+                <button key={r.id} className="demo-user-btn" onClick={() => submitReport(r.id)} style={{ padding: '12px 14px' }}>
                   <span style={{ fontSize: 14 }}>{r.label}</span>
                 </button>
               ))}

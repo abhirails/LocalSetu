@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { useCurrentLocation } from '../hooks/useCurrentLocation'
+import { matchesLiveLocality } from '../lib/geocode'
 import PostCard from '../components/PostCard'
 import ProviderCard from '../components/ProviderCard'
 import BottomNav from '../components/BottomNav'
@@ -13,17 +15,43 @@ const TABS = [
 ]
 
 export default function HomeScreen() {
-  const { state, helpers } = useApp()
+  const { state, actions, helpers } = useApp()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
 
-  const rightNowPosts = helpers.getActivePosts('right_now')
+  // ── Live location ──
+  const { locality: liveLocality, status: locationStatus, error: locationError, requestLocation } = useCurrentLocation()
+
+  // Sync detected locality into global state so PostCard & other screens can use it
+  useEffect(() => {
+    if (liveLocality) {
+      actions.setLiveLocality(liveLocality, 'granted')
+    } else if (locationStatus === 'denied' || locationStatus === 'error') {
+      actions.setLocationStatus(locationStatus)
+    }
+  }, [liveLocality, locationStatus])
+
+  // ── Feed data ──
+  const rightNowPosts  = helpers.getActivePosts('right_now')
   const needItNowPosts = helpers.getActivePosts('need_it_now')
   const providers = state.providers
     .filter(p => !helpers.isBlocked(p.id))
     .sort((a, b) => b.recommendationCount - a.recommendationCount)
 
-  const allFeed = [
+  // Sort posts: near-you first, then pinned, then by recency
+  const sortWithNearby = (posts) => {
+    return [...posts].sort((a, b) => {
+      const aNear = liveLocality ? matchesLiveLocality(a.locality, liveLocality) : false
+      const bNear = liveLocality ? matchesLiveLocality(b.locality, liveLocality) : false
+      if (aNear && !bNear) return -1
+      if (!aNear && bNear) return 1
+      if (a.isPinned && !b.isPinned) return -1
+      if (!a.isPinned && b.isPinned) return 1
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+  }
+
+  const allFeed = sortWithNearby([
     ...rightNowPosts.filter(p => {
       const ageHrs = (Date.now() - new Date(p.createdAt)) / 3600000
       return ageHrs < 2
@@ -34,8 +62,112 @@ export default function HomeScreen() {
     }).slice(0, 2),
     ...rightNowPosts.slice(3),
     ...needItNowPosts.slice(2),
-  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i) // dedupe
+  ].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i))
 
+  // ── Location banner ──
+  const renderLocationBanner = () => {
+    if (locationStatus === 'loading') {
+      return (
+        <div style={{
+          background: '#F0F9FF',
+          borderBottom: '1px solid #BAE6FD',
+          padding: '8px 16px',
+          fontSize: 12,
+          color: '#0369A1',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
+        }}>
+          <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>🔄</span>
+          Detecting your location…
+        </div>
+      )
+    }
+
+    if (liveLocality) {
+      const isHome = state.currentUser?.locality?.toLowerCase().includes(liveLocality.toLowerCase())
+        || liveLocality.toLowerCase().includes((state.currentUser?.locality || '').toLowerCase().split(' ')[0])
+
+      return (
+        <div style={{
+          background: 'linear-gradient(90deg, #F0FDF4, #DCFCE7)',
+          borderBottom: '1px solid #BBF7D0',
+          padding: '8px 16px',
+          fontSize: 12,
+          color: '#15803D',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontWeight: 600
+        }}>
+          <span>📍</span>
+          <span>Live: <strong>{liveLocality}</strong></span>
+          {isHome && <span style={{ color: '#86EFAC', fontWeight: 400 }}>· Home area</span>}
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={requestLocation}
+            style={{ fontSize: 11, color: '#15803D', fontWeight: 700, textDecoration: 'underline' }}
+          >
+            Refresh
+          </button>
+        </div>
+      )
+    }
+
+    if (locationStatus === 'denied') {
+      return (
+        <div style={{
+          background: '#FFFBEB',
+          borderBottom: '1px solid #FDE68A',
+          padding: '8px 16px',
+          fontSize: 12,
+          color: '#92400E',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}>
+          <span>⚠️</span>
+          <span>Location blocked — showing all posts. Enable in browser settings.</span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={requestLocation}
+            style={{ fontSize: 11, color: '#92400E', fontWeight: 700, textDecoration: 'underline' }}
+          >
+            Retry
+          </button>
+        </div>
+      )
+    }
+
+    if (locationStatus === 'idle') {
+      return (
+        <div style={{
+          background: '#F8FAFC',
+          borderBottom: '1px solid var(--border-light)',
+          padding: '8px 16px',
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}>
+          <span>📍</span>
+          <span>{state.currentUser?.locality || 'Kharghar'}</span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={requestLocation}
+            style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}
+          >
+            Use live location
+          </button>
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  // ── Feed render ──
   const renderFeed = () => {
     if (activeTab === 'all') {
       if (allFeed.length === 0) {
@@ -58,7 +190,8 @@ export default function HomeScreen() {
     }
 
     if (activeTab === 'right_now') {
-      if (rightNowPosts.length === 0) {
+      const sorted = sortWithNearby(rightNowPosts)
+      if (sorted.length === 0) {
         return (
           <div className="empty-state">
             <div className="empty-icon">⚡</div>
@@ -70,15 +203,12 @@ export default function HomeScreen() {
           </div>
         )
       }
-      return (
-        <div className="card-list">
-          {rightNowPosts.map(post => <PostCard key={post.id} post={post} />)}
-        </div>
-      )
+      return <div className="card-list">{sorted.map(post => <PostCard key={post.id} post={post} />)}</div>
     }
 
     if (activeTab === 'need_it_now') {
-      if (needItNowPosts.length === 0) {
+      const sorted = sortWithNearby(needItNowPosts)
+      if (sorted.length === 0) {
         return (
           <div className="empty-state">
             <div className="empty-icon">🙋</div>
@@ -90,11 +220,7 @@ export default function HomeScreen() {
           </div>
         )
       }
-      return (
-        <div className="card-list">
-          {needItNowPosts.map(post => <PostCard key={post.id} post={post} />)}
-        </div>
-      )
+      return <div className="card-list">{sorted.map(post => <PostCard key={post.id} post={post} />)}</div>
     }
 
     if (activeTab === 'verified_help') {
@@ -119,19 +245,23 @@ export default function HomeScreen() {
         <div className="header">
           <div>
             <div className="header-logo">Local<span>Setu</span></div>
-            <div className="header-locality">📍 {state.currentUser?.locality || 'Kharghar'}</div>
+            <div className="header-locality">
+              {liveLocality
+                ? `📍 ${liveLocality}`
+                : `📍 ${state.currentUser?.locality || 'Kharghar'}`
+              }
+            </div>
           </div>
           <div className="header-actions">
-            <button className="icon-btn" onClick={() => navigate('/profile')} title="Profile">
-              👤
-            </button>
+            <button className="icon-btn" onClick={() => navigate('/profile')} title="Profile">👤</button>
             {state.currentUser?.role === 'admin' && (
-              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin">
-                🛡️
-              </button>
+              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin">🛡️</button>
             )}
           </div>
         </div>
+
+        {/* Live location banner */}
+        {renderLocationBanner()}
 
         {/* Tabs */}
         <div className="tab-bar">

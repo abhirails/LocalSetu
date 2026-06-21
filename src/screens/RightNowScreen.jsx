@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { matchesLiveLocality } from '../lib/geocode'
 import PostCard from '../components/PostCard'
 import BottomNav from '../components/BottomNav'
 
@@ -17,17 +18,22 @@ const CATEGORIES = [
 ]
 
 export default function RightNowScreen() {
-  const { helpers } = useApp()
+  const { state, helpers } = useApp()
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('all')
 
+  const liveLocality = state.liveLocality
   const allPosts = helpers.getActivePosts('right_now')
   const filtered = activeCategory === 'all'
     ? allPosts
     : allPosts.filter(p => p.category === activeCategory)
 
-  // Sort: pinned first, then by still-happening count + recency
+  // Sort: nearby first, then pinned, then by still-happening + recency
   const sorted = [...filtered].sort((a, b) => {
+    const aNear = liveLocality ? matchesLiveLocality(a.locality, liveLocality) : false
+    const bNear = liveLocality ? matchesLiveLocality(b.locality, liveLocality) : false
+    if (aNear && !bNear) return -1
+    if (!aNear && bNear) return 1
     if (a.isPinned && !b.isPinned) return -1
     if (!a.isPinned && b.isPinned) return 1
     const scoreA = (a.stillHappeningCount || 0) * 2 + (Date.now() - new Date(a.createdAt)) / -3600000
@@ -38,28 +44,21 @@ export default function RightNowScreen() {
   return (
     <div className="app-container">
       <div className="screen">
-        {/* Header */}
         <div className="header">
           <div>
             <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>⚡ Nearby Right Now</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Real-time local updates</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {liveLocality ? `📍 Live: ${liveLocality}` : 'Real-time local updates'}
+            </div>
           </div>
           <button
-            style={{
-              background: 'var(--primary)',
-              color: 'white',
-              borderRadius: 20,
-              padding: '7px 14px',
-              fontSize: 13,
-              fontWeight: 700
-            }}
+            style={{ background: 'var(--primary)', color: 'white', borderRadius: 20, padding: '7px 14px', fontSize: 13, fontWeight: 700 }}
             onClick={() => navigate('/create?type=right_now')}
           >
             + Update
           </button>
         </div>
 
-        {/* Category filter */}
         <div className="filter-chips">
           {CATEGORIES.map(cat => (
             <button
@@ -72,25 +71,13 @@ export default function RightNowScreen() {
           ))}
         </div>
 
-        {/* How it works hint */}
         {sorted.length > 0 && (
-          <div style={{
-            background: 'var(--primary-light)',
-            padding: '8px 16px',
-            fontSize: 12,
-            color: 'var(--primary)',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            borderBottom: '1px solid var(--border-light)'
-          }}>
+          <div style={{ background: 'var(--primary-light)', padding: '8px 16px', fontSize: 12, color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid var(--border-light)' }}>
             <span>🔄</span>
             <span>Tap "Still happening" to confirm an update is current. Auto-expires in 6–12h.</span>
           </div>
         )}
 
-        {/* Posts */}
         {sorted.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📡</div>
@@ -99,11 +86,7 @@ export default function RightNowScreen() {
               No active {activeCategory !== 'all' ? activeCategory.replace('_', ' ') + ' ' : ''}updates right now.
               Be the first to post if something is happening.
             </div>
-            <button
-              className="btn btn-primary"
-              style={{ width: 'auto', marginTop: 8 }}
-              onClick={() => navigate('/create?type=right_now')}
-            >
+            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create?type=right_now')}>
               + Post an update
             </button>
           </div>
