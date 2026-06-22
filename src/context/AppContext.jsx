@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import * as db from '../lib/db'
-import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS } from '../data/demoData'
+import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS, DEMO_BUSINESSES } from '../data/demoData'
 
 const AppContext = createContext(null)
 
@@ -31,6 +31,7 @@ function initDemoState() {
     societies: DEMO_SOCIETIES,
     societyPosts: DEMO_SOCIETY_POSTS,
     societyMembers: DEMO_SOCIETY_MEMBERS,
+    businesses: DEMO_BUSINESSES,
     liveLocality: null,
     liveCoords: null,
     locationStatus: 'idle',
@@ -260,6 +261,21 @@ function reducer(state, action) {
       }
     }
 
+    // ── Phase 4: Businesses + Boosts ──
+    case 'SET_BUSINESSES':
+      return { ...state, businesses: action.businesses }
+    case 'ADD_BUSINESS':
+      return { ...state, businesses: [action.business, ...state.businesses] }
+    case 'BOOST_POST':
+      return {
+        ...state,
+        posts: state.posts.map(p =>
+          p.id === action.postId
+            ? { ...p, isBoosted: true, boostedUntil: action.boostedUntil }
+            : p
+        )
+      }
+
     // ── Toast ──
     case 'SET_TOAST':
       return { ...state, toast: action.message }
@@ -278,7 +294,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, () =>
     isSupabaseConfigured
-      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
+      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], businesses: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
       : initDemoState()
   )
 
@@ -813,6 +829,30 @@ export function AppProvider({ children }) {
       toast('Request rejected.')
       if (isSupabaseConfigured) {
         await db.rejectSocietyMember(memberId, state.currentUser.id).catch(console.error)
+      }
+    },
+
+    // ── Phase 4: Business Listings ──
+    loadBusinesses: async ({ category } = {}) => {
+      if (isSupabaseConfigured) {
+        try {
+          const businesses = await db.getBusinesses({ category })
+          dispatch({ type: 'SET_BUSINESSES', businesses })
+        } catch (err) {
+          console.error('LocalSetu: loadBusinesses failed', err)
+        }
+      }
+      // In demo mode businesses are already in state from initialisation
+    },
+
+    // ── Phase 4: Post Boost ──
+    boostPost: async (postId, hours = 48) => {
+      const boostedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+      // Optimistic
+      dispatch({ type: 'BOOST_POST', postId, boostedUntil })
+      toast(`Post boosted for ${hours}h! ⚡`)
+      if (isSupabaseConfigured && state.currentUser) {
+        await db.boostPost(postId, state.currentUser.id, hours).catch(console.error)
       }
     },
 

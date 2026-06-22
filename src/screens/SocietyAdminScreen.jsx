@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import PaymentModal from '../components/PaymentModal'
 
 const TAB_ACTIVE   = 'active'
 const TAB_RESOLVED = 'resolved'
@@ -27,6 +28,7 @@ export default function SocietyAdminScreen() {
   const [postType, setPostType]         = useState('notice')
   const [actionLoading, setActionLoading] = useState(null)
   const [memberTab, setMemberTab]       = useState('pending') // 'pending' | 'approved'
+  const [showProModal, setShowProModal] = useState(false)
 
   const society = helpers.getMySociety()
   const isAdmin = helpers.isSocietyAdmin()
@@ -162,6 +164,55 @@ export default function SocietyAdminScreen() {
           </div>
         ))}
       </div>
+
+      {/* Phase 4: Society Admin Pro upgrade banner */}
+      {!society.isPro && (
+        <div style={{
+          margin: '14px 16px 0',
+          background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+          borderRadius: 14, padding: '14px 16px', color: '#fff'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>
+                ✨ Upgrade to Society Admin Pro
+              </div>
+              <div style={{ fontSize: 11.5, opacity: 0.9, lineHeight: 1.5 }}>
+                Maintenance records · Event RSVPs · Bulk announcements · Priority support
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 900 }}>₹999</div>
+              <div style={{ fontSize: 10, opacity: 0.8 }}>/year</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => setShowProModal(true)}
+              style={{
+                flex: 1, padding: '8px 0', borderRadius: 8,
+                background: '#fff', color: '#4f46e5',
+                border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer'
+              }}
+            >
+              Upgrade Now
+            </button>
+            <button
+              onClick={() => {
+                alert('Society Admin Pro features:\n\n✅ Maintenance bill tracker\n✅ Event RSVP (with headcount)\n✅ Bulk WhatsApp announcements\n✅ Visitor log\n✅ Complaint tracker\n✅ Priority email support')
+              }}
+              style={{
+                padding: '8px 14px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.2)', color: '#fff',
+                border: '1px solid rgba(255,255,255,0.4)',
+                fontWeight: 600, fontSize: 12, cursor: 'pointer'
+              }}
+            >
+              Learn more
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Post buttons — only shown on posts tabs */}
       {tab !== TAB_MEMBERS && (
@@ -775,6 +826,28 @@ function AdminPostForm({ type, societyId, onClose, onSaved }) {
           </button>
         </form>
       </div>
+      {/* Phase 5: Society Admin Pro payment modal */}
+      {showProModal && (
+        <PaymentModal
+          title="✨ Society Admin Pro"
+          description="Annual plan — renews after 1 year."
+          type="society_pro"
+          metadata={{ society_id: society?.id }}
+          currentUser={state.currentUser || {}}
+          options={[{
+            id:          'pro_annual',
+            label:       '1 Year — Admin Pro',
+            price:       999,
+            months:      12,
+            description: 'Maintenance log · Event RSVPs · Bulk announcements',
+          }]}
+          onSuccess={() => {
+            // Optimistic: show Pro state immediately (Supabase will confirm on next load)
+            actions.setToast && actions.setToast('Society Admin Pro activated! ✨')
+          }}
+          onClose={() => setShowProModal(false)}
+        />
+      )}
     </div>
   )
 }

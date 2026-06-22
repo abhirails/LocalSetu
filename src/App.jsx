@@ -14,6 +14,8 @@ import AdminScreen           from './screens/AdminScreen'
 import SocietyListScreen     from './screens/SocietyListScreen'
 import SocietyDetailScreen   from './screens/SocietyDetailScreen'
 import SocietyAdminScreen    from './screens/SocietyAdminScreen'
+import BusinessListingsScreen  from './screens/BusinessListingsScreen'
+import BusinessDetailScreen    from './screens/BusinessDetailScreen'
 
 // Loading splash while Supabase session is being restored
 function LoadingScreen() {
@@ -65,6 +67,8 @@ function AppRoutes() {
         <Route path="/societies"     element={<AuthGuard><SocietyListScreen /></AuthGuard>} />
         <Route path="/society/:id"   element={<AuthGuard><SocietyDetailScreen /></AuthGuard>} />
         <Route path="/society-admin" element={<AuthGuard><SocietyAdminScreen /></AuthGuard>} />
+        <Route path="/businesses"    element={<AuthGuard><BusinessListingsScreen /></AuthGuard>} />
+        <Route path="/business/:id"  element={<AuthGuard><BusinessDetailScreen /></AuthGuard>} />
         <Route
           path="/"
           element={<Navigate to={state.currentUser ? '/home' : '/login'} replace />}

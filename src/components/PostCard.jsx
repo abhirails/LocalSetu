@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { matchesLiveLocality } from '../lib/geocode'
 import CategoryBadge from './CategoryBadge'
-import { CATEGORY_META } from '../data/demoData'
+import { BOOST_OPTIONS } from '../data/demoData'
+import PaymentModal from './PaymentModal'
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -24,6 +25,15 @@ function timeUntil(dateStr) {
   return `Expires in ${Math.floor(hrs / 24)}d`
 }
 
+function boostTimeLeft(boostedUntil) {
+  if (!boostedUntil) return ''
+  const diff = new Date(boostedUntil).getTime() - Date.now()
+  if (diff <= 0) return ''
+  const hrs = Math.floor(diff / 3600000)
+  if (hrs < 1) return 'Boosted · <1h left'
+  return `Boosted · ${hrs}h left`
+}
+
 function getInitials(name) {
   return name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?'
 }
@@ -32,6 +42,7 @@ export default function PostCard({ post, compact = false }) {
   const { state, actions, helpers } = useApp()
   const navigate = useNavigate()
   const [showReport, setShowReport] = useState(false)
+  const [showBoost, setShowBoost] = useState(false)
 
   const author = helpers.getUser(post.userId)
   const isSaved = helpers.isPostSaved(post.id)
@@ -39,6 +50,8 @@ export default function PostCard({ post, compact = false }) {
   const isMyPost = state.currentUser?.id === post.userId
   const alreadyConfirmed = post.confirmedBy?.includes(state.currentUser?.id)
   const isNearby = matchesLiveLocality(post.locality, state.liveLocality)
+  const canBoost = isMyPost && (post.type === 'right_now' || post.type === 'need_it_now') && !post.isBoosted
+  const boostLabel = boostTimeLeft(post.boostedUntil)
 
   if (post.status === 'removed') return null
 
@@ -56,6 +69,7 @@ export default function PostCard({ post, compact = false }) {
 
   const handleSave = (e) => { e.stopPropagation(); actions.savePost(post.id) }
   const handleReport = (e) => { e.stopPropagation(); setShowReport(true) }
+  const handleBoostClick = (e) => { e.stopPropagation(); setShowBoost(true) }
 
   const handleShare = async (e) => {
     e.stopPropagation()
@@ -71,7 +85,14 @@ export default function PostCard({ post, compact = false }) {
 
   return (
     <>
-      <div className="post-card" onClick={goToDetail} style={{ cursor: 'pointer' }}>
+      <div className="post-card" onClick={goToDetail} style={{ cursor: 'pointer', border: post.isBoosted ? '1.5px solid #f59e0b' : undefined }}>
+        {/* Boost badge */}
+        {post.isBoosted && boostLabel && (
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', background: '#fef3c7', borderRadius: 6, padding: '2px 8px', marginBottom: 8, display: 'inline-block' }}>
+            ⚡ {boostLabel}
+          </div>
+        )}
+
         <div className="post-card-header">
           <div className="post-avatar">{getInitials(author?.name)}</div>
           <div className="post-meta">
@@ -129,6 +150,16 @@ export default function PostCard({ post, compact = false }) {
             {replyCount > 0 ? replyCount : 'Reply'}
           </button>
           <div className="action-spacer" />
+          {canBoost && (
+            <button
+              className="action-icon-btn"
+              onClick={handleBoostClick}
+              title="Boost post"
+              style={{ color: '#d97706', fontWeight: 700 }}
+            >
+              ⚡ Boost
+            </button>
+          )}
           <button className="action-icon-btn" onClick={handleShare} title="Share">Share</button>
           <button className={`action-icon-btn ${isSaved ? 'saved' : ''}`} onClick={handleSave} title={isSaved ? 'Unsave' : 'Save'}>
             {isSaved ? 'Saved' : 'Save'}
@@ -141,6 +172,26 @@ export default function PostCard({ post, compact = false }) {
           )}
         </div>
       </div>
+
+      {showBoost && (
+        <PaymentModal
+          title="⚡ Boost Post"
+          description="Priority placement in the feed for more visibility."
+          type="boost"
+          metadata={{ post_id: post.id }}
+          currentUser={state.currentUser || {}}
+          options={BOOST_OPTIONS.map(o => ({
+            id:          o.id,
+            label:       o.label,
+            price:       o.price,
+            hours:       o.hours,
+            description: `Top of feed for ${o.hours} hours`,
+          }))}
+          defaultOption={BOOST_OPTIONS[1]?.id}
+          onSuccess={() => { actions.boostPost(post.id, BOOST_OPTIONS.find(o => o.id === 'boost_48')?.hours || 48) }}
+          onClose={() => setShowBoost(false)}
+        />
+      )}
 
       {showReport && (
         <div className="overlay" onClick={() => setShowReport(false)}>

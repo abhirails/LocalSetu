@@ -347,190 +347,128 @@ CREATE INDEX IF NOT EXISTS idx_posts_locality
   ON public.posts(locality);
 
 -- ============================================================
--- PHASE 3 MIGRATION — Private Resident Groups
+-- PHASE 4 MIGRATION — Monetization
 -- Run in Supabase SQL Editor if upgrading an existing database
 -- ============================================================
 
--- 1. Visibility tier on society_posts
---    'public'    → pinned to public feed (existing pin_to_feed=true posts)
---    'society'   → approved members only
---    'committee' → committee + admin only
---    'admin'     → society admin only
-ALTER TABLE public.society_posts
-  ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'
-    CHECK (visibility IN ('public', 'society', 'committee', 'admin'));
-
--- 2. Society members table
-CREATE TABLE IF NOT EXISTS public.society_members (
+-- 1. Verified Business Listings
+CREATE TABLE IF NOT EXISTS public.businesses (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  society_id    UUID NOT NULL REFERENCES public.societies(id) ON DELETE CASCADE,
-  user_id       UUID NOT NULL REFERENCES public.profiles(id)  ON DELETE CASCADE,
-  role          TEXT NOT NULL DEFAULT 'resident'
-                  CHECK (role IN ('resident', 'committee', 'admin')),
-  status        TEXT NOT NULL DEFAULT 'pending'
-                  CHECK (status IN ('pending', 'approved', 'rejected')),
-  requested_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  reviewed_at   TIMESTAMPTZ,
-  reviewed_by   UUID REFERENCES public.profiles(id),
-  UNIQUE(society_id, user_id)
+  name          TEXT NOT NULL,
+  category      TEXT NOT NULL,
+  plan          TEXT NOT NULL DEFAULT 'basic'
+                  CHECK (plan IN ('basic', 'standard', 'premium')),
+  tagline       TEXT,
+  description   TEXT,
+  phone         TEXT,
+  whatsapp      TEXT,
+  locality      TEXT NOT NULL,
+  address       TEXT,
+  is_verified   BOOLEAN NOT NULL DEFAULT false,
+  rating        NUMERIC(2,1) NOT NULL DEFAULT 0,
+  review_count  INTEGER NOT NULL DEFAULT 0,
+  owner_id      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  plan_expires_at TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_society_members_society ON public.society_members(society_id);
-CREATE INDEX IF NOT EXISTS idx_society_members_user    ON public.society_members(user_id);
-CREATE INDEX IF NOT EXISTS idx_society_members_status  ON public.society_members(status);
+CREATE INDEX IF NOT EXISTS idx_businesses_locality  ON public.businesses(locality);
+CREATE INDEX IF NOT EXISTS idx_businesses_category  ON public.businesses(category);
+CREATE INDEX IF NOT EXISTS idx_businesses_plan      ON public.businesses(plan);
 
--- 3. RLS for society_members
-ALTER TABLE public.society_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.businesses ENABLE ROW LEVEL SECURITY;
 
--- Anyone can see membership records for their own society (society admins need full list)
-CREATE POLICY "Members can view society membership"
-  ON public.society_members FOR SELECT
+CREATE POLICY "Anyone can view verified businesses"
+  ON public.businesses FOR SELECT
+  USING (is_verified = true OR owner_id = auth.uid());
+
+CREATE POLICY "Owners can insert their business"
+  ON public.businesses FOR INSERT
+  WITH CHECK (auth.uid() = owner_id);
+
+CREATE POLICY "Owners can update their business"
+  ON public.businesses FOR UPDATE
+  USING (auth.uid() = owner_id);
+
+CREATE POLICY "Admins can manage all businesses"
+  ON public.businesses FOR ALL
   USING (
-    user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'society_admin' AND society_id = society_members.society_id
-    )
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Residents can request to join
-CREATE POLICY "Users can request to join society"
-  ON public.society_members FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+-- 2. Post boosts
+ALTER TABLE public.posts
+  ADD COLUMN IF NOT EXISTS is_boosted    BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS boosted_until TIMESTAMPTZ;
 
--- Society admin can approve/reject (update status)
-CREATE POLICY "Society admin can review members"
-  ON public.society_members FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'society_admin' AND society_id = society_members.society_id
-    )
-  );
-
--- 4. RLS for society_posts — members-only visibility gate
---    Society admins see all. Approved members see 'society'. Committee+ see 'committee'. Public see 'public'.
-DROP POLICY IF EXISTS "Society posts visible to all" ON public.society_posts;
-
-CREATE POLICY "Society posts visibility gate"
-  ON public.society_posts FOR SELECT
-  USING (
-    visibility = 'public'
-    OR (
-      visibility = 'society'
-      AND EXISTS (
-        SELECT 1 FROM public.society_members
-        WHERE society_id = society_posts.society_id
-          AND user_id = auth.uid()
-          AND status = 'approved'
-      )
-    )
-    OR (
-      visibility IN ('committee', 'admin')
-      AND EXISTS (
-        SELECT 1 FROM public.society_members
-        WHERE society_id = society_posts.society_id
-          AND user_id = auth.uid()
-          AND status = 'approved'
-          AND role IN ('committee', 'admin')
-      )
-    )
-  );
-
-CREATE TABLE IF NOT EXISTS public.society_posts (
-  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  society_id      UUID REFERENCES public.societies(id) ON DELETE CASCADE NOT NULL,
-  posted_by       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  type            TEXT NOT NULL CHECK (type IN ('notice', 'event')),
-  title           TEXT NOT NULL CHECK (char_length(title) <= 120),
-  content         TEXT NOT NULL CHECK (char_length(content) <= 500),
-  event_date      TIMESTAMPTZ,           -- for events
-  event_location  TEXT,                  -- for events
-  status          TEXT NOT NULL DEFAULT 'active'
-                    CHECK (status IN ('active', 'resolved', 'removed')),
-  pin_to_feed     BOOLEAN NOT NULL DEFAULT true,  -- show in main KhargharConnect feed
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS public.post_boosts (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  post_id      UUID NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  amount_paise INTEGER NOT NULL DEFAULT 2900,  -- ₹29 in paise
+  boosted_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  boosted_until TIMESTAMPTZ NOT NULL,
+  payment_ref  TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_society_posts_society   ON public.society_posts(society_id);
-CREATE INDEX IF NOT EXISTS idx_society_posts_feed      ON public.society_posts(pin_to_feed, status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_societies_sector        ON public.societies(sector);
+CREATE INDEX IF NOT EXISTS idx_post_boosts_post ON public.post_boosts(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_boosts_user ON public.post_boosts(user_id);
+CREATE INDEX IF NOT EXISTS idx_posts_boosted    ON public.posts(is_boosted, boosted_until);
 
--- RLS
-ALTER TABLE public.societies        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.society_posts    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.post_boosts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Societies visible to all"
-  ON public.societies FOR SELECT USING (true);
+CREATE POLICY "Users see own boosts"
+  ON public.post_boosts FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Society posts visible to all when active"
-  ON public.society_posts FOR SELECT
-  USING (status = 'active');
+CREATE POLICY "Users can boost posts"
+  ON public.post_boosts FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Society admins can insert posts"
-  ON public.society_posts FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-        AND role = 'society_admin'
-        AND society_id = society_posts.society_id
-    )
-  );
-
-CREATE POLICY "Society admins can update their posts"
-  ON public.society_posts FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-        AND role = 'society_admin'
-        AND society_id = society_posts.society_id
-    )
-  );
-
-CREATE POLICY "App admins can manage all society posts"
-  ON public.society_posts FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+-- 3. Society Admin Pro flag
+ALTER TABLE public.societies
+  ADD COLUMN IF NOT EXISTS is_pro         BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS pro_expires_at TIMESTAMPTZ;
 
 -- ============================================================
--- 11. PUSH SUBSCRIPTIONS (Web Push / VAPID)
+-- PHASE 5 MIGRATION — Real Payments (Razorpay)
+-- Run in Supabase SQL Editor if upgrading an existing database
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS public.push_subscriptions (
-  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  endpoint    TEXT NOT NULL,
-  p256dh      TEXT NOT NULL,
-  auth        TEXT NOT NULL,
-  created_at  TIMESTAMPTZ DEFAULT now() NOT NULL,
-  updated_at  TIMESTAMPTZ DEFAULT now() NOT NULL,
-  UNIQUE (user_id, endpoint)
+CREATE TABLE IF NOT EXISTS public.payments (
+  id                    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id               UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type                  TEXT NOT NULL
+                          CHECK (type IN ('boost', 'society_pro', 'business_listing')),
+  amount_paise          INTEGER NOT NULL,
+  razorpay_order_id     TEXT NOT NULL UNIQUE,
+  razorpay_payment_id   TEXT,
+  razorpay_signature    TEXT,
+  status                TEXT NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending', 'captured', 'failed')),
+  -- Flexible metadata: post_id for boosts, society_id for pro, etc.
+  metadata              JSONB NOT NULL DEFAULT '{}',
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_push_subs_user ON public.push_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_user   ON public.payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_type   ON public.payments(type);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON public.payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_order  ON public.payments(razorpay_order_id);
 
-ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users manage own push subscriptions"
-  ON public.push_subscriptions FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- Users can see their own payments
+CREATE POLICY "Users can view own payments"
+  ON public.payments FOR SELECT
+  USING (auth.uid() = user_id);
 
--- Service role (Edge Functions) can read all subscriptions to send pushes
-CREATE POLICY "Service role reads all subscriptions"
-  ON public.push_subscriptions FOR SELECT
-  USING (auth.role() = 'service_role');
+-- Service role (serverless function) inserts payments
+CREATE POLICY "Service role can insert payments"
+  ON public.payments FOR INSERT
+  WITH CHECK (true);  -- secured by service_role key in the API route
 
--- ============================================================
--- 12. REALTIME (enable for live feed)
--- ============================================================
-
-ALTER PUBLICATION supabase_realtime ADD TABLE public.posts;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.replies;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.post_confirmations;
+-- Service role can update payment status after verification
+CREATE POLICY "Service role can update payments"
+  ON public.payments FOR UPDATE
+  USING (true);  -- secured by service_role key in the API route

@@ -394,6 +394,9 @@ function normalizePost(p) {
     distanceRange:        p.distance_range,
     helperCount:          p.helper_count,
     isFulfilled:          p.is_fulfilled,
+    // Phase 4 — Boost
+    isBoosted:            p.is_boosted ?? false,
+    boostedUntil:         p.boosted_until ?? null,
     // Joined author
     author:               p.profiles ? normalizeProfile(p.profiles) : null
   }
@@ -447,6 +450,8 @@ export function normalizeSociety(s) {
     totalFlats:   s.total_flats,
     adminId:      s.admin_id,
     isVerified:   s.is_verified,
+    isPro:        s.is_pro ?? s.isPro ?? false,
+    proExpiresAt: s.pro_expires_at ?? s.proExpiresAt ?? null,
     createdAt:    s.created_at
   }
 }
@@ -606,4 +611,94 @@ export async function rejectSocietyMember(memberId, reviewedById) {
     .single()
   if (error) throw error
   return normalizeMember(data)
+}
+
+// ============================================================
+// Phase 4 — Business Listings + Post Boosts
+// ============================================================
+
+export function normalizeBusiness(b) {
+  return {
+    id:             b.id,
+    name:           b.name,
+    category:       b.category,
+    plan:           b.plan || 'basic',
+    tagline:        b.tagline || '',
+    description:    b.description || '',
+    phone:          b.phone || null,
+    whatsapp:       b.whatsapp || null,
+    locality:       b.locality,
+    address:        b.address || '',
+    isVerified:     b.is_verified ?? b.isVerified ?? false,
+    rating:         parseFloat(b.rating) || 0,
+    reviewCount:    b.review_count ?? b.reviewCount ?? 0,
+    ownerId:        b.owner_id ?? b.ownerId ?? null,
+    planExpiresAt:  b.plan_expires_at ?? b.planExpiresAt ?? null,
+    openHours:      b.open_hours ?? b.openHours ?? null,
+    tags:           b.tags || [],
+    createdAt:      b.created_at ?? b.createdAt ?? null,
+  }
+}
+
+export async function getBusinesses({ category } = {}) {
+  let q = supabase
+    .from('businesses')
+    .select('*')
+    .order('plan', { ascending: false })   // premium first
+    .order('rating', { ascending: false })
+  if (category && category !== 'all') q = q.eq('category', category)
+  const { data, error } = await q
+  if (error) throw error
+  return (data || []).map(normalizeBusiness)
+}
+
+export async function getBusinessById(id) {
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw error
+  return normalizeBusiness(data)
+}
+
+export async function createBusiness(bizData) {
+  const { data, error } = await supabase
+    .from('businesses')
+    .insert({
+      name:        bizData.name,
+      category:    bizData.category,
+      plan:        bizData.plan || 'basic',
+      tagline:     bizData.tagline,
+      description: bizData.description,
+      phone:       bizData.phone,
+      whatsapp:    bizData.whatsapp,
+      locality:    bizData.locality,
+      address:     bizData.address,
+      owner_id:    bizData.ownerId,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeBusiness(data)
+}
+
+export async function boostPost(postId, userId, hours = 48) {
+  const boostedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+  // Insert boost record
+  await supabase.from('post_boosts').insert({
+    post_id:       postId,
+    user_id:       userId,
+    amount_paise:  hours === 24 ? 1900 : hours === 48 ? 2900 : 3900,
+    boosted_until: boostedUntil,
+  })
+  // Update post
+  const { data, error } = await supabase
+    .from('posts')
+    .update({ is_boosted: true, boosted_until: boostedUntil })
+    .eq('id', postId)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizePost(data)
 }
