@@ -5,7 +5,7 @@
 // Approved members see all posts up to their visibility tier.
 // ============================================================
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 
@@ -25,7 +25,11 @@ export default function SocietyDetailScreen() {
   const { state, actions, helpers } = useApp()
 
   const [tab, setTab] = useState(TAB_NOTICE)
-  const [showPostForm, setShowPostForm] = useState(false)
+  const [showPostForm, setShowPostForm]     = useState(false)
+  const [showComplaintForm, setShowComplaintForm] = useState(false)
+  const [complaintTitle, setComplaintTitle]       = useState('')
+  const [complaintCat, setComplaintCat]           = useState('other')
+  const [complaintDesc, setComplaintDesc]         = useState('')
   const [joinLoading, setJoinLoading] = useState(false)
 
   const society = helpers.getSociety(id)
@@ -157,6 +161,12 @@ export default function SocietyDetailScreen() {
               You have access to members-only posts
             </div>
           </div>
+          <button
+            onClick={() => setShowComplaintForm(true)}
+            style={{ marginLeft: 'auto', padding: '5px 12px', borderRadius: 8, border: '1px solid #22c55e60', background: 'transparent', fontSize: 11, color: '#16a34a', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+          >
+            📋 Complaint
+          </button>
         </div>
       )}
       {isPending && (
@@ -350,6 +360,42 @@ export default function SocietyDetailScreen() {
       </div>
 
       {/* Post form modal */}
+      {showComplaintForm && (
+        <div className="overlay" onClick={() => setShowComplaintForm(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div className="modal-title">📋 File a Complaint</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input placeholder="What's the issue?" value={complaintTitle} onChange={e => setComplaintTitle(e.target.value)}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, background: 'var(--bg)' }} />
+              <select value={complaintCat} onChange={e => setComplaintCat(e.target.value)}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, background: 'var(--bg)' }}>
+                {[
+                  {id:'noise',label:'🔊 Noise'},{id:'parking',label:'🚗 Parking'},
+                  {id:'cleanliness',label:'🧹 Cleanliness'},{id:'security',label:'🔒 Security'},
+                  {id:'neighbour',label:'👤 Neighbour'},{id:'lift',label:'🛗 Lift'},
+                  {id:'water',label:'💧 Water'},{id:'other',label:'📋 Other'},
+                ].map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+              <textarea placeholder="More details (optional)" value={complaintDesc} onChange={e => setComplaintDesc(e.target.value)} rows={3}
+                style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, resize: 'none', background: 'var(--bg)' }} />
+            </div>
+            <button
+              disabled={!complaintTitle.trim()}
+              onClick={async () => {
+                if (!complaintTitle.trim()) return
+                await actions.fileComplaint({ societyId: id, userId: state.currentUser?.id, title: complaintTitle.trim(), category: complaintCat, description: complaintDesc.trim() })
+                setShowComplaintForm(false)
+                setComplaintTitle(''); setComplaintCat('other'); setComplaintDesc('')
+              }}
+              style={{ width: '100%', marginTop: 14, padding: '13px 0', borderRadius: 12, background: complaintTitle.trim() ? 'var(--primary)' : 'var(--border)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 15, cursor: complaintTitle.trim() ? 'pointer' : 'not-allowed' }}
+            >
+              Submit Complaint
+            </button>
+          </div>
+        </div>
+      )}
+
       {showPostForm && (
         <SocietyPostForm
           type={tab}
@@ -364,7 +410,17 @@ export default function SocietyDetailScreen() {
 }
 
 function SocietyPostCard({ post, showVisibility }) {
+  const { state, actions, helpers } = useApp()
   const isEvent = post.type === 'event'
+  const rsvpStatus = isEvent ? helpers.getRsvpStatus(post.id) : null
+  const rsvpCounts = isEvent ? helpers.getRsvpCounts(post.id) : null
+  const [rsvpLoading, setRsvpLoading] = React.useState(false)
+
+  const handleRsvp = async (newStatus) => {
+    setRsvpLoading(true)
+    await actions.rsvpPost(post.id, rsvpStatus === newStatus ? null : newStatus)
+    setRsvpLoading(false)
+  }
   const visMeta = VISIBILITY_META[post.visibility || 'public']
 
   const formattedDate = (dateStr) => {
@@ -444,6 +500,43 @@ function SocietyPostCard({ post, showVisibility }) {
       <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text)', lineHeight: 1.5 }}>
         {post.content}
       </p>
+
+      {/* RSVP buttons — events only */}
+      {isEvent && state.currentUser && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginBottom: 8, fontWeight: 600 }}>
+            RSVP
+            {rsvpCounts && rsvpCounts.total > 0 && (
+              <span style={{ fontWeight: 400, marginLeft: 8 }}>
+                {rsvpCounts.going > 0 && `${rsvpCounts.going} going`}
+                {rsvpCounts.maybe > 0 && ` · ${rsvpCounts.maybe} maybe`}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 7 }}>
+            {[
+              { status: 'going',     label: '✅ Going',  active: '#dcfce7', activeTxt: '#15803d' },
+              { status: 'maybe',     label: '🤔 Maybe',  active: '#fef9c3', activeTxt: '#92400e' },
+              { status: 'not_going', label: "❌ Can't go", active: '#fee2e2', activeTxt: '#b91c1c' },
+            ].map(opt => (
+              <button
+                key={opt.status}
+                disabled={rsvpLoading}
+                onClick={() => handleRsvp(opt.status)}
+                style={{
+                  flex: 1, padding: '7px 4px', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600,
+                  border: rsvpStatus === opt.status ? `1.5px solid ${opt.activeTxt}` : '1.5px solid var(--border)',
+                  background: rsvpStatus === opt.status ? opt.active : 'var(--bg)',
+                  color: rsvpStatus === opt.status ? opt.activeTxt : 'var(--text-muted)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

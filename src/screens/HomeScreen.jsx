@@ -17,6 +17,7 @@ const TABS = [
 
 export default function HomeScreen() {
   const { state, actions, helpers } = useApp()
+  const newPostCount = state.newPostCount || 0
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
   const [showLocalitySwitcher, setShowLocalitySwitcher] = useState(false)
@@ -166,6 +167,21 @@ export default function HomeScreen() {
         )
       }
       return (
+        <>
+        {newPostCount > 0 && (
+          <button
+            onClick={() => { actions.clearNewPostCount() }}
+            style={{
+              display: 'block', width: '100%', padding: '10px 16px',
+              background: 'var(--primary)', color: '#fff',
+              border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, textAlign: 'center',
+              position: 'sticky', top: 0, zIndex: 9,
+            }}
+          >
+            ↑ {newPostCount} new post{newPostCount > 1 ? 's' : ''} — tap to see
+          </button>
+        )}
         <div className="card-list">
           {allFeed.map(post =>
             post.societyId
@@ -173,6 +189,7 @@ export default function HomeScreen() {
               : <PostCard key={post.id} post={post} />
           )}
         </div>
+        </>
       )
     }
     if (activeTab === 'right_now') {

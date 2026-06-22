@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react'
+import { useRealtime } from '../hooks/useRealtime'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import * as db from '../lib/db'
-import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS, DEMO_BUSINESSES } from '../data/demoData'
+import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS, DEMO_BUSINESSES, DEMO_RSVPS, DEMO_MAINTENANCE_RECORDS, DEMO_COMPLAINTS } from '../data/demoData'
 
 const AppContext = createContext(null)
 
@@ -32,6 +33,9 @@ function initDemoState() {
     societyPosts: DEMO_SOCIETY_POSTS,
     societyMembers: DEMO_SOCIETY_MEMBERS,
     businesses: DEMO_BUSINESSES,
+    rsvps: DEMO_RSVPS,
+    maintenanceRecords: DEMO_MAINTENANCE_RECORDS,
+    complaints: DEMO_COMPLAINTS,
     liveLocality: null,
     liveCoords: null,
     locationStatus: 'idle',
@@ -282,6 +286,105 @@ function reducer(state, action) {
     case 'CLEAR_TOAST':
       return { ...state, toast: null }
 
+    // ── Phase 6: RSVPs ──
+    case 'SET_RSVPS':
+      return { ...state, rsvps: action.rsvps }
+    case 'UPSERT_RSVP': {
+      const exists = state.rsvps.find(r => r.societyPostId === action.rsvp.societyPostId && r.userId === action.rsvp.userId)
+      return {
+        ...state,
+        rsvps: exists
+          ? state.rsvps.map(r => r.id === action.rsvp.id || (r.societyPostId === action.rsvp.societyPostId && r.userId === action.rsvp.userId) ? { ...r, ...action.rsvp } : r)
+          : [action.rsvp, ...state.rsvps]
+      }
+    }
+    case 'REMOVE_RSVP':
+      return { ...state, rsvps: state.rsvps.filter(r => !(r.societyPostId === action.societyPostId && r.userId === action.userId)) }
+
+    // ── Phase 6: Maintenance ──
+    case 'SET_MAINTENANCE':
+      return { ...state, maintenanceRecords: action.records }
+    case 'ADD_MAINTENANCE':
+      return { ...state, maintenanceRecords: [action.record, ...state.maintenanceRecords] }
+    case 'UPDATE_MAINTENANCE':
+      return { ...state, maintenanceRecords: state.maintenanceRecords.map(m => m.id === action.record.id ? { ...m, ...action.record } : m) }
+
+    // ── Phase 6: Complaints ──
+    case 'SET_COMPLAINTS':
+      return { ...state, complaints: action.complaints }
+    case 'ADD_COMPLAINT':
+      return { ...state, complaints: [action.complaint, ...state.complaints] }
+    case 'UPDATE_COMPLAINT':
+      return { ...state, complaints: state.complaints.map(c => c.id === action.complaint.id ? { ...c, ...action.complaint } : c) }
+
+    // ── Real-time feed updates ──
+    case 'REALTIME_NEW_POST': {
+      const raw = action.raw
+      // Normalize minimal fields — full fetch not needed for feed display
+      const newPost = {
+        id: raw.id, type: raw.type, userId: raw.user_id, locality: raw.locality,
+        category: raw.category, content: raw.content, status: raw.status,
+        expiresAt: raw.expires_at, isPinned: raw.is_pinned, reportCount: raw.report_count,
+        createdAt: raw.created_at, stillHappeningCount: raw.still_happening_count || 0,
+        lastConfirmedAt: raw.last_confirmed_at, confirmedBy: [],
+        neededBy: raw.needed_by, distanceRange: raw.distance_range,
+        helperCount: raw.helper_count || 0, isFulfilled: raw.is_fulfilled || false,
+        isBoosted: raw.is_boosted || false, boostedUntil: raw.boosted_until || null,
+        author: null,
+      }
+      // Avoid duplicate if we already have it
+      if (state.posts.find(p => p.id === newPost.id)) return state
+      return { ...state, posts: [newPost, ...state.posts], newPostCount: (state.newPostCount || 0) + 1 }
+    }
+    case 'REALTIME_UPDATE_POST': {
+      const raw = action.raw
+      return {
+        ...state,
+        posts: state.posts.map(p => p.id === raw.id ? {
+          ...p,
+          status:               raw.status,
+          isBoosted:            raw.is_boosted ?? p.isBoosted,
+          boostedUntil:         raw.boosted_until ?? p.boostedUntil,
+          stillHappeningCount:  raw.still_happening_count ?? p.stillHappeningCount,
+          helperCount:          raw.helper_count ?? p.helperCount,
+          isFulfilled:          raw.is_fulfilled ?? p.isFulfilled,
+        } : p)
+      }
+    }
+    case 'REALTIME_CONFIRMATION': {
+      return {
+        ...state,
+        posts: state.posts.map(p => p.id === action.postId && !p.confirmedBy.includes(action.userId) ? {
+          ...p,
+          stillHappeningCount: p.stillHappeningCount + 1,
+          confirmedBy: [...p.confirmedBy, action.userId],
+        } : p)
+      }
+    }
+    case 'REALTIME_NEW_REPLY': {
+      const raw = action.raw
+      const newReply = {
+        id: raw.id, postId: raw.post_id, userId: raw.user_id,
+        content: raw.content, createdAt: raw.created_at, isHidden: raw.is_hidden || false,
+      }
+      if (state.replies.find(r => r.id === newReply.id)) return state
+      return { ...state, replies: [newReply, ...state.replies] }
+    }
+    case 'REALTIME_NEW_SOCIETY_POST': {
+      const raw = action.raw
+      if (!raw.pin_to_feed) return state  // members-only posts don't appear in feed
+      const sp = {
+        id: raw.id, societyId: raw.society_id, postedBy: raw.posted_by, type: raw.type,
+        title: raw.title, content: raw.content, eventDate: raw.event_date,
+        eventLocation: raw.event_location, status: raw.status, pinToFeed: raw.pin_to_feed,
+        visibility: raw.visibility || 'public', createdAt: raw.created_at,
+      }
+      if (state.societyPosts.find(p => p.id === sp.id)) return state
+      return { ...state, societyPosts: [sp, ...state.societyPosts] }
+    }
+    case 'CLEAR_NEW_POST_COUNT':
+      return { ...state, newPostCount: 0 }
+
     default:
       return state
   }
@@ -294,7 +397,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, () =>
     isSupabaseConfigured
-      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], businesses: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
+      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], businesses: [], rsvps: [], maintenanceRecords: [], complaints: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
       : initDemoState()
   )
 
@@ -315,6 +418,9 @@ export function AppProvider({ children }) {
       return () => clearTimeout(t)
     }
   }, [state.toast])
+
+  // ── Real-time feed ──
+  useRealtime(dispatch, state.currentUser)
 
   const toast = useCallback((message) => {
     dispatch({ type: 'SET_TOAST', message })
@@ -846,6 +952,68 @@ export function AppProvider({ children }) {
     },
 
     // ── Phase 4: Post Boost ──
+    // ── Phase 6: RSVPs ──
+    rsvpPost: async (societyPostId, status) => {
+      const userId = state.currentUser?.id
+      if (!userId) return
+      if (status === null) {
+        dispatch({ type: 'REMOVE_RSVP', societyPostId, userId })
+        if (isSupabaseConfigured) await db.deleteRsvp(userId, societyPostId).catch(console.error)
+        return
+      }
+      const optimistic = { id: `rsvp_${Date.now()}`, societyPostId, userId, status, createdAt: new Date().toISOString() }
+      dispatch({ type: 'UPSERT_RSVP', rsvp: optimistic })
+      if (isSupabaseConfigured) {
+        const real = await db.upsertRsvp(userId, societyPostId, status).catch(console.error)
+        if (real) dispatch({ type: 'UPSERT_RSVP', rsvp: real })
+      }
+    },
+
+    // ── Phase 6: Maintenance ──
+    loadMaintenance: async (societyId) => {
+      if (isSupabaseConfigured) {
+        const records = await db.getMaintenanceRecords(societyId).catch(() => [])
+        dispatch({ type: 'SET_MAINTENANCE', records })
+      }
+    },
+    addMaintenanceRecord: async (record) => {
+      const optimistic = { ...record, id: `maint_${Date.now()}`, createdAt: new Date().toISOString(), status: 'open' }
+      dispatch({ type: 'ADD_MAINTENANCE', record: optimistic })
+      toast('Maintenance record added.')
+      if (isSupabaseConfigured) {
+        const real = await db.createMaintenanceRecord(record).catch(console.error)
+        if (real) dispatch({ type: 'UPDATE_MAINTENANCE', record: { ...optimistic, ...real } })
+      }
+    },
+    updateMaintenanceRecord: async (id, updates) => {
+      dispatch({ type: 'UPDATE_MAINTENANCE', record: { id, ...updates } })
+      if (isSupabaseConfigured) await db.updateMaintenanceRecord(id, updates).catch(console.error)
+    },
+
+    // ── Phase 6: Complaints ──
+    loadComplaints: async (societyId) => {
+      if (isSupabaseConfigured) {
+        const complaints = await db.getComplaints(societyId).catch(() => [])
+        dispatch({ type: 'SET_COMPLAINTS', complaints })
+      }
+    },
+    fileComplaint: async (complaint) => {
+      const optimistic = { ...complaint, id: `comp_${Date.now()}`, createdAt: new Date().toISOString(), status: 'open', adminNote: null }
+      dispatch({ type: 'ADD_COMPLAINT', complaint: optimistic })
+      toast('Complaint filed.')
+      if (isSupabaseConfigured) {
+        const real = await db.createComplaint(complaint).catch(console.error)
+        if (real) dispatch({ type: 'UPDATE_COMPLAINT', complaint: { ...optimistic, ...real } })
+      }
+    },
+    updateComplaint: async (id, updates) => {
+      dispatch({ type: 'UPDATE_COMPLAINT', complaint: { id, ...updates } })
+      toast('Complaint updated.')
+      if (isSupabaseConfigured) await db.updateComplaint(id, updates).catch(console.error)
+    },
+
+    clearNewPostCount: () => dispatch({ type: 'CLEAR_NEW_POST_COUNT' }),
+
     boostPost: async (postId, hours = 48) => {
       const boostedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
       // Optimistic
@@ -950,6 +1118,24 @@ export function AppProvider({ children }) {
     getMySociety: () => state.societies.find(s => s.id === state.currentUser?.societyId),
 
     // Phase 3 — membership helpers
+    // Phase 6: RSVP helpers
+    getRsvpStatus: (societyPostId) => {
+      const userId = state.currentUser?.id
+      if (!userId) return null
+      return state.rsvps.find(r => r.societyPostId === societyPostId && r.userId === userId)?.status || null
+    },
+    getRsvpCounts: (societyPostId) => {
+      const rsvps = state.rsvps.filter(r => r.societyPostId === societyPostId)
+      return {
+        going:     rsvps.filter(r => r.status === 'going').length,
+        maybe:     rsvps.filter(r => r.status === 'maybe').length,
+        not_going: rsvps.filter(r => r.status === 'not_going').length,
+        total:     rsvps.length,
+      }
+    },
+    getSocietyMaintenance: (societyId) => (state.maintenanceRecords || []).filter(m => m.societyId === societyId),
+    getSocietyComplaints:  (societyId) => (state.complaints || []).filter(c => c.societyId === societyId),
+
     getMembership: (societyId) =>
       (state.societyMembers || []).find(
         m => m.societyId === societyId && m.userId === state.currentUser?.id

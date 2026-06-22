@@ -542,3 +542,109 @@ export const BOOST_OPTIONS = [
   { id: 'boost_48', label: '48 hours', price: 29, hours: 48 },
   { id: 'boost_72', label: '72 hours', price: 39, hours: 72 },
 ]
+
+// ============================================================
+// Phase 6 — RSVPs, Maintenance, Complaints
+// ============================================================
+
+export const DEMO_RSVPS = [
+  // Annual Society Meeting (sp_3 - soc_1, event, daysAhead(7))
+  { id: 'rsvp_1', societyPostId: 'sp_3', userId: 'user_1', status: 'going',     createdAt: hours(5) },
+  { id: 'rsvp_2', societyPostId: 'sp_3', userId: 'user_2', status: 'going',     createdAt: hours(4) },
+  { id: 'rsvp_3', societyPostId: 'sp_3', userId: 'user_3', status: 'maybe',     createdAt: hours(3) },
+  // Yoga camp (sp_5 - soc_2)
+  { id: 'rsvp_4', societyPostId: 'sp_5', userId: 'user_2', status: 'going',     createdAt: hours(10) },
+  { id: 'rsvp_5', societyPostId: 'sp_5', userId: 'user_3', status: 'going',     createdAt: hours(8)  },
+  // Children's Day (sp_6 - soc_4)
+  { id: 'rsvp_6', societyPostId: 'sp_6', userId: 'user_4', status: 'going',     createdAt: hours(6)  },
+  { id: 'rsvp_7', societyPostId: 'sp_6', userId: 'user_5', status: 'maybe',     createdAt: hours(5)  },
+]
+
+const daysBack = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
+
+export const DEMO_MAINTENANCE_RECORDS = [
+  {
+    id: 'maint_1', societyId: 'soc_1',
+    title: 'Water pump — bearing replacement',
+    category: 'plumbing', status: 'resolved',
+    description: 'Main water pump bearing worn out. Replaced by Shinde Plumbing Works.',
+    vendorName: 'Shinde Plumbing Works', costEstimate: 8000, actualCost: 7500,
+    reportedBy: 'user_1', assignedTo: 'Shinde Plumbing Works',
+    createdAt: daysBack(14), resolvedAt: daysBack(10)
+  },
+  {
+    id: 'maint_2', societyId: 'soc_1',
+    title: 'CCTV camera — Gate B not recording',
+    category: 'security', status: 'in_progress',
+    description: 'CCTV camera at Gate B stopped recording after power surge. Technician scheduled.',
+    vendorName: 'Secure Vision Pvt Ltd', costEstimate: 3500, actualCost: null,
+    reportedBy: 'user_3', assignedTo: 'Secure Vision Pvt Ltd',
+    createdAt: daysBack(3), resolvedAt: null
+  },
+  {
+    id: 'maint_3', societyId: 'soc_1',
+    title: 'Lobby light replacement — Wing C staircase',
+    category: 'electrical', status: 'open',
+    description: 'Fluorescent tube lights in Wing C staircase (floors 3–7) need replacement.',
+    vendorName: null, costEstimate: 1200, actualCost: null,
+    reportedBy: 'user_2', assignedTo: null,
+    createdAt: daysBack(1), resolvedAt: null
+  },
+  {
+    id: 'maint_4', societyId: 'soc_1',
+    title: 'Terrace garden — monthly cleaning',
+    category: 'common_area', status: 'resolved',
+    description: 'Quarterly deep cleaning of terrace garden. Includes trimming, weeding, fertilising.',
+    vendorName: 'Green Thumb Landscaping', costEstimate: 2000, actualCost: 2000,
+    reportedBy: 'user_1', assignedTo: 'Green Thumb Landscaping',
+    createdAt: daysBack(30), resolvedAt: daysBack(28)
+  },
+]
+
+export const DEMO_COMPLAINTS = [
+  {
+    id: 'comp_1', societyId: 'soc_1', userId: 'user_2',
+    title: 'Loud music from Flat 304 after 11 PM',
+    category: 'noise', status: 'acknowledged',
+    description: 'Repeated issue on Friday and Saturday nights. Already mentioned to security.',
+    adminNote: 'Spoken to resident of 304. Will issue written notice if repeated.',
+    createdAt: daysBack(5), resolvedAt: null
+  },
+  {
+    id: 'comp_2', societyId: 'soc_1', userId: 'user_4',
+    title: 'Visitor car blocking allocated parking slot B-12',
+    category: 'parking', status: 'resolved',
+    description: 'Happened 3 times this week. Request tow-away policy enforcement.',
+    adminNote: 'New signage installed at B-12. Security instructed to tow unauthorised vehicles.',
+    createdAt: daysBack(8), resolvedAt: daysBack(3)
+  },
+  {
+    id: 'comp_3', societyId: 'soc_1', userId: 'user_5',
+    title: 'Garbage not collected from 4th floor — 2 days',
+    category: 'cleanliness', status: 'open',
+    description: 'Housekeeping has missed the 4th floor collection for the past 2 days.',
+    adminNote: null,
+    createdAt: daysBack(1), resolvedAt: null
+  },
+]
+
+export const MAINTENANCE_CATEGORIES = [
+  { id: 'plumbing',    label: 'Plumbing',     icon: '🔧' },
+  { id: 'electrical',  label: 'Electrical',   icon: '⚡' },
+  { id: 'lift',        label: 'Lift',         icon: '🛗' },
+  { id: 'common_area', label: 'Common Area',  icon: '🏢' },
+  { id: 'security',    label: 'Security',     icon: '🔒' },
+  { id: 'cleaning',    label: 'Cleaning',     icon: '🧹' },
+  { id: 'other',       label: 'Other',        icon: '📋' },
+]
+
+export const COMPLAINT_CATEGORIES = [
+  { id: 'noise',       label: 'Noise',        icon: '🔊' },
+  { id: 'parking',     label: 'Parking',      icon: '🚗' },
+  { id: 'cleanliness', label: 'Cleanliness',  icon: '🧹' },
+  { id: 'security',    label: 'Security',     icon: '🔒' },
+  { id: 'neighbour',   label: 'Neighbour',    icon: '👤' },
+  { id: 'lift',        label: 'Lift',         icon: '🛗' },
+  { id: 'water',       label: 'Water',        icon: '💧' },
+  { id: 'other',       label: 'Other',        icon: '📋' },
+]

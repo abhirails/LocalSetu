@@ -244,6 +244,31 @@ export default function SocietyAdminScreen() {
         </div>
       )}
 
+      {/* Maintenance & Complaints quick link (Pro feature) */}
+      <div style={{ padding: '10px 16px 0' }}>
+        <button
+          onClick={() => navigate('/maintenance')}
+          style={{
+            width: '100%', padding: '11px 16px', borderRadius: 10,
+            background: society.isPro ? 'rgba(30,58,95,0.07)' : 'rgba(124,58,237,0.06)',
+            border: society.isPro ? '1px solid rgba(30,58,95,0.2)' : '1px dashed rgba(124,58,237,0.4)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>🔧</span>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: society.isPro ? '#1e3a5f' : '#7c3aed' }}>
+              Maintenance & Complaints
+              {!society.isPro && <span style={{ marginLeft: 6, fontSize: 10, background: '#ede9fe', color: '#7c3aed', padding: '1px 6px', borderRadius: 4 }}>Pro</span>}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+              Track repairs, vendors, costs · manage resident complaints
+            </div>
+          </div>
+          <span style={{ fontSize: 16, color: 'var(--text-muted)' }}>→</span>
+        </button>
+      </div>
+
       {/* Tabs */}
       <div style={{ padding: '14px 16px 0' }}>
         <div style={{

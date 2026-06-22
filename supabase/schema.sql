@@ -472,3 +472,151 @@ CREATE POLICY "Service role can insert payments"
 CREATE POLICY "Service role can update payments"
   ON public.payments FOR UPDATE
   USING (true);  -- secured by service_role key in the API route
+
+-- ============================================================
+-- PHASE 6 MIGRATION — Real-time, Events RSVP, Maintenance
+-- ============================================================
+
+-- 1. Event RSVPs
+CREATE TABLE IF NOT EXISTS public.rsvps (
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  society_post_id UUID NOT NULL REFERENCES public.society_posts(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  status          TEXT NOT NULL DEFAULT 'going'
+                    CHECK (status IN ('going', 'maybe', 'not_going')),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(society_post_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rsvps_post ON public.rsvps(society_post_id);
+CREATE INDEX IF NOT EXISTS idx_rsvps_user ON public.rsvps(user_id);
+
+ALTER TABLE public.rsvps ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Society members can view RSVPs"
+  ON public.rsvps FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.society_members sm
+      JOIN public.society_posts sp ON sp.id = rsvps.society_post_id
+      WHERE sm.society_id = sp.society_id AND sm.user_id = auth.uid() AND sm.status = 'approved'
+    )
+  );
+
+CREATE POLICY "Users can RSVP"
+  ON public.rsvps FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own RSVP"
+  ON public.rsvps FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own RSVP"
+  ON public.rsvps FOR DELETE USING (auth.uid() = user_id);
+
+-- 2. Maintenance Records
+CREATE TABLE IF NOT EXISTS public.maintenance_records (
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  society_id      UUID NOT NULL REFERENCES public.societies(id) ON DELETE CASCADE,
+  title           TEXT NOT NULL,
+  category        TEXT NOT NULL
+                    CHECK (category IN ('plumbing','electrical','lift','common_area','security','cleaning','other')),
+  description     TEXT,
+  status          TEXT NOT NULL DEFAULT 'open'
+                    CHECK (status IN ('open','in_progress','resolved')),
+  vendor_name     TEXT,
+  cost_estimate   INTEGER,  -- in rupees
+  actual_cost     INTEGER,  -- in rupees
+  reported_by     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  assigned_to     TEXT,     -- vendor/person name
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at     TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_society ON public.maintenance_records(society_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_status  ON public.maintenance_records(status);
+
+ALTER TABLE public.maintenance_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Society members can view maintenance"
+  ON public.maintenance_records FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.society_members
+      WHERE society_id = maintenance_records.society_id
+        AND user_id = auth.uid()
+        AND status = 'approved'
+    )
+  );
+
+CREATE POLICY "Society admins can manage maintenance"
+  ON public.maintenance_records FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'society_admin'
+        AND society_id = maintenance_records.society_id
+    )
+  );
+
+-- 3. Resident Complaints
+CREATE TABLE IF NOT EXISTS public.complaints (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  society_id  UUID NOT NULL REFERENCES public.societies(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  category    TEXT NOT NULL
+                CHECK (category IN ('noise','parking','cleanliness','security','neighbour','lift','water','other')),
+  description TEXT,
+  status      TEXT NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open','acknowledged','resolved')),
+  admin_note  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_society ON public.complaints(society_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_user    ON public.complaints(user_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status  ON public.complaints(status);
+
+ALTER TABLE public.complaints ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own complaints"
+  ON public.complaints FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Society admins can view all complaints"
+  ON public.complaints FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'society_admin'
+        AND society_id = complaints.society_id
+    )
+  );
+
+CREATE POLICY "Members can file complaints"
+  ON public.complaints FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1 FROM public.society_members
+      WHERE society_id = complaints.society_id
+        AND user_id = auth.uid() AND status = 'approved'
+    )
+  );
+
+CREATE POLICY "Society admins can update complaints"
+  ON public.complaints FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND role = 'society_admin'
+        AND society_id = complaints.society_id
+    )
+  );
+
+-- Enable realtime on feed tables
+ALTER PUBLICATION supabase_realtime ADD TABLE public.post_confirmations;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.society_posts;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.rsvps;

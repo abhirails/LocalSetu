@@ -702,3 +702,171 @@ export async function boostPost(postId, userId, hours = 48) {
   if (error) throw error
   return normalizePost(data)
 }
+
+// ============================================================
+// Phase 6 — RSVPs, Maintenance, Complaints
+// ============================================================
+
+// ── RSVPs ──────────────────────────────────────────────────
+
+export function normalizeRsvp(r) {
+  return {
+    id:             r.id,
+    societyPostId:  r.society_post_id ?? r.societyPostId,
+    userId:         r.user_id ?? r.userId,
+    status:         r.status,
+    createdAt:      r.created_at ?? r.createdAt,
+  }
+}
+
+export async function getRsvpsForPost(postId) {
+  const { data, error } = await supabase
+    .from('rsvps')
+    .select('*')
+    .eq('society_post_id', postId)
+  if (error) throw error
+  return (data || []).map(normalizeRsvp)
+}
+
+export async function upsertRsvp(userId, societyPostId, status) {
+  const { data, error } = await supabase
+    .from('rsvps')
+    .upsert({ user_id: userId, society_post_id: societyPostId, status, updated_at: new Date().toISOString() },
+             { onConflict: 'society_post_id,user_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeRsvp(data)
+}
+
+export async function deleteRsvp(userId, societyPostId) {
+  const { error } = await supabase
+    .from('rsvps')
+    .delete()
+    .eq('user_id', userId)
+    .eq('society_post_id', societyPostId)
+  if (error) throw error
+}
+
+// ── Maintenance Records ─────────────────────────────────────
+
+export function normalizeMaintenance(m) {
+  return {
+    id:            m.id,
+    societyId:     m.society_id ?? m.societyId,
+    title:         m.title,
+    category:      m.category,
+    description:   m.description || '',
+    status:        m.status,
+    vendorName:    m.vendor_name ?? m.vendorName ?? null,
+    costEstimate:  m.cost_estimate ?? m.costEstimate ?? null,
+    actualCost:    m.actual_cost ?? m.actualCost ?? null,
+    reportedBy:    m.reported_by ?? m.reportedBy ?? null,
+    assignedTo:    m.assigned_to ?? m.assignedTo ?? null,
+    createdAt:     m.created_at ?? m.createdAt,
+    resolvedAt:    m.resolved_at ?? m.resolvedAt ?? null,
+  }
+}
+
+export async function getMaintenanceRecords(societyId) {
+  const { data, error } = await supabase
+    .from('maintenance_records')
+    .select('*')
+    .eq('society_id', societyId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map(normalizeMaintenance)
+}
+
+export async function createMaintenanceRecord(record) {
+  const { data, error } = await supabase
+    .from('maintenance_records')
+    .insert({
+      society_id:     record.societyId,
+      title:          record.title,
+      category:       record.category,
+      description:    record.description,
+      vendor_name:    record.vendorName,
+      cost_estimate:  record.costEstimate,
+      reported_by:    record.reportedBy,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeMaintenance(data)
+}
+
+export async function updateMaintenanceRecord(id, updates) {
+  const mapped = {}
+  if (updates.status)      mapped.status       = updates.status
+  if (updates.vendorName)  mapped.vendor_name  = updates.vendorName
+  if (updates.assignedTo)  mapped.assigned_to  = updates.assignedTo
+  if (updates.actualCost)  mapped.actual_cost  = updates.actualCost
+  if (updates.status === 'resolved') mapped.resolved_at = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('maintenance_records')
+    .update(mapped)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeMaintenance(data)
+}
+
+// ── Complaints ──────────────────────────────────────────────
+
+export function normalizeComplaint(c) {
+  return {
+    id:          c.id,
+    societyId:   c.society_id ?? c.societyId,
+    userId:      c.user_id ?? c.userId,
+    title:       c.title,
+    category:    c.category,
+    description: c.description || '',
+    status:      c.status,
+    adminNote:   c.admin_note ?? c.adminNote ?? null,
+    createdAt:   c.created_at ?? c.createdAt,
+    resolvedAt:  c.resolved_at ?? c.resolvedAt ?? null,
+  }
+}
+
+export async function getComplaints(societyId) {
+  const { data, error } = await supabase
+    .from('complaints')
+    .select('*')
+    .eq('society_id', societyId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map(normalizeComplaint)
+}
+
+export async function createComplaint(complaint) {
+  const { data, error } = await supabase
+    .from('complaints')
+    .insert({
+      society_id:  complaint.societyId,
+      user_id:     complaint.userId,
+      title:       complaint.title,
+      category:    complaint.category,
+      description: complaint.description,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeComplaint(data)
+}
+
+export async function updateComplaint(id, updates) {
+  const mapped = {}
+  if (updates.status)    mapped.status      = updates.status
+  if (updates.adminNote) mapped.admin_note  = updates.adminNote
+  if (updates.status === 'resolved') mapped.resolved_at = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('complaints')
+    .update(mapped)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeComplaint(data)
+}
