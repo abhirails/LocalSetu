@@ -6,6 +6,10 @@ import CategoryBadge from './CategoryBadge'
 import { BOOST_OPTIONS, CIVIC_SUBCATEGORIES, MEDICAL_SUBCATEGORIES } from '../data/demoData'
 import PaymentModal from './PaymentModal'
 
+// ── Feature flags ──
+// Set to true in Phase 4 when payment flow is ready
+const ENABLE_BOOSTS = false
+
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -53,7 +57,8 @@ export default function PostCard({ post, compact = false }) {
   const isAdmin = state.currentUser?.role === 'admin'
   const alreadyConfirmed = post.confirmedBy?.includes(state.currentUser?.id)
   const isNearby = matchesLiveLocality(post.locality, state.liveLocality)
-  const canBoost = isMyPost && (post.type === 'right_now' || post.type === 'need_it_now') && !post.isBoosted
+  // Boost: Phase 4 only, owner + need_it_now only, gated by ENABLE_BOOSTS flag
+  const canBoost = ENABLE_BOOSTS && isMyPost && post.type === 'need_it_now' && !post.isBoosted
   const boostLabel = boostTimeLeft(post.boostedUntil)
 
   if (post.status === 'removed') return null
@@ -293,7 +298,7 @@ export default function PostCard({ post, compact = false }) {
             {isMyPost && post.type === 'need_it_now' && !post.isFulfilled && (
               <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }}
                 style={{ color: 'var(--success)', borderColor: 'var(--success)', background: 'var(--success-light)', fontWeight: 700 }}>
-                ✓ Done
+                ✓ Mark as fulfilled
               </button>
             )}
           </div>

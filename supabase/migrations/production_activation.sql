@@ -98,24 +98,24 @@ BEGIN
       visibility, is_pinned, pin_to_feed, status
     )
     VALUES
-      (s1, seed_user, seed_user, 'notice', 'Starter notice: Water timing update',
-       'Community starter: Water supply may be low-pressure between 10 AM and 2 PM today. Please store water if needed.',
-       'Community starter: Water supply may be low-pressure between 10 AM and 2 PM today. Please store water if needed.',
+      (s1, seed_user, seed_user, 'notice', 'Water timing update',
+       'Water supply may be low-pressure between 10 AM and 2 PM today. Please store water if needed.',
+       'Water supply may be low-pressure between 10 AM and 2 PM today. Please store water if needed.',
        'public', true, true, 'active'),
-      (s2, seed_user, seed_user, 'event', 'Starter event: Society clean-up drive',
-       'Community starter: Weekend clean-up near the society gate — Sunday 8 AM. Volunteers welcome.',
-       'Community starter: Weekend clean-up near the society gate — Sunday 8 AM. Volunteers welcome.',
+      (s2, seed_user, seed_user, 'event', 'Society clean-up drive',
+       'Weekend clean-up near the society gate — Sunday 8 AM. Volunteers welcome.',
+       'Weekend clean-up near the society gate — Sunday 8 AM. Volunteers welcome.',
        'public', true, true, 'active'),
-      (s3, seed_user, seed_user, 'notice', 'Starter notice: Lost keys at gate',
-       'Community starter: A key set was found near the main gate. Contact society office if yours.',
-       'Community starter: A key set was found near the main gate. Contact society office if yours.',
+      (s3, seed_user, seed_user, 'notice', 'Lost keys at gate',
+       'A key set was found near the main gate. Contact society office if yours.',
+       'A key set was found near the main gate. Contact society office if yours.',
        'public', false, false, 'active');
   END IF;
 
   RAISE NOTICE 'Seeded 5 Kharghar societies (+ starter notices if profile exists).';
 END $$;
 
--- ── 5. Starter public feed posts (skip if community starters already exist) ──
+-- ── 5. Starter public feed posts (skip if recent Kharghar pinned posts exist) ──
 DO $$
 DECLARE
   seed_user UUID;
@@ -123,12 +123,12 @@ DECLARE
 BEGIN
   SELECT COUNT(*) INTO starter_count
   FROM public.posts
-  WHERE content LIKE 'Community starter:%'
-     OR content LIKE 'Need to purchase:%'
-     OR content LIKE 'Need help finding%';
+  WHERE locality ILIKE '%Kharghar%'
+    AND is_pinned = true
+    AND created_at > NOW() - INTERVAL '7 days';
 
-  IF starter_count >= 5 THEN
-    RAISE NOTICE 'Starter feed already seeded (% posts).', starter_count;
+  IF starter_count >= 3 THEN
+    RAISE NOTICE 'Starter feed already seeded (% pinned posts).', starter_count;
     RETURN;
   END IF;
 
@@ -141,20 +141,20 @@ BEGIN
 
   INSERT INTO public.posts (user_id, type, locality, category, content, status, expires_at, is_pinned)
   VALUES
-    (seed_user, 'right_now', 'Kharghar', 'water',
-     'Community starter: Low water pressure reported near Sector 20. Please confirm if it is still happening in your building.',
+    (seed_user, 'right_now', 'Kharghar Sector 20', 'water',
+     'Low water pressure reported near Sector 20. Please confirm if it is still happening in your building.',
      'active', NOW() + INTERVAL '8 hours', true),
     (seed_user, 'right_now', 'Kharghar', 'traffic',
-     'Community starter: Slow traffic near Utsav Chowk side road. Add confirmation if you are nearby.',
+     'Slow traffic near Utsav Chowk side road. Add confirmation if you are nearby.',
      'active', NOW() + INTERVAL '4 hours', false),
     (seed_user, 'need_it_now', 'Kharghar', 'need_to_buy',
-     'Need to purchase: 16A socket, plug top, and insulation tape. Nearby electrical shops can quote price and delivery time.',
+     '16A socket, plug top, and insulation tape needed. Nearby shops can quote price and delivery time.',
      'active', NOW() + INTERVAL '12 hours', true),
     (seed_user, 'need_it_now', 'Kharghar', 'home_help',
-     'Need help finding a reliable electrician near Kharghar today evening.',
+     'Looking for a reliable electrician in Kharghar for today evening.',
      'active', NOW() + INTERVAL '10 hours', false),
     (seed_user, 'right_now', 'Kharghar', 'lost_found',
-     'Community starter: A set of keys was found near a society gate in Kharghar. Reply only if you can identify it.',
+     'A set of keys was found near a society gate in Kharghar. Reply only if you can identify it.',
      'active', NOW() + INTERVAL '1 day', false);
 
   RAISE NOTICE 'Starter public feed posts added.';

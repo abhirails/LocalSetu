@@ -1157,6 +1157,8 @@ export function AppProvider({ children }) {
           if (type && p.type !== type) return false
           if (p.status === 'removed') return false
           if (helpers.isBlocked(p.userId)) return false
+          // Hide expired posts from the feed
+          if (p.expiresAt && new Date(p.expiresAt) < Date.now()) return false
           return true
         })
         .sort((a, b) => {

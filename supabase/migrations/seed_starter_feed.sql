@@ -12,13 +12,12 @@ DECLARE
 BEGIN
   SELECT COUNT(*) INTO starter_count
   FROM public.posts
-  WHERE content LIKE 'Starter update:%'
-     OR content LIKE 'Starter notice:%'
-     OR content LIKE 'Need to purchase:%'
-     OR content LIKE 'Need help finding%';
+  WHERE locality = 'Kharghar'
+    AND is_pinned = true
+    AND created_at > NOW() - INTERVAL '7 days';
 
-  IF starter_count >= 5 THEN
-    RAISE NOTICE 'Starter feed already seeded (% posts) — skipping.', starter_count;
+  IF starter_count >= 3 THEN
+    RAISE NOTICE 'Starter feed already seeded (% pinned posts) — skipping.', starter_count;
     RETURN;
   END IF;
 
@@ -39,9 +38,9 @@ BEGIN
     (
       seed_user,
       'right_now',
-      'Kharghar',
+      'Kharghar Sector 20',
       'water',
-      'Starter update: Low water pressure reported near Sector 20. Please confirm if it is still happening in your building.',
+      'Pani pressure bahut kam hai Sector 20 mein since morning. Koi CIDCO complaint kiya kya? Please confirm if your building is also affected.',
       'active',
       NOW() + INTERVAL '8 hours',
       true
@@ -51,7 +50,7 @@ BEGIN
       'right_now',
       'Kharghar',
       'traffic',
-      'Starter update: Slow traffic near Utsav Chowk side road. Add confirmation if you are nearby.',
+      'Slow moving traffic near Utsav Chowk side road. Looks like a minor accident. Try the inner road via Sector 15.',
       'active',
       NOW() + INTERVAL '4 hours',
       false
@@ -59,9 +58,9 @@ BEGIN
     (
       seed_user,
       'need_it_now',
-      'Kharghar',
+      'Kharghar Sector 20',
       'need_to_buy',
-      'Need to purchase: 16A socket, plug top, and insulation tape. Nearby electrical shops can quote price and delivery time.',
+      '16A socket, plug top, and insulation tape chahiye. Koi nearby electrical shop hai jo deliver kar sake? Please quote price and time.',
       'active',
       NOW() + INTERVAL '12 hours',
       true
@@ -71,7 +70,7 @@ BEGIN
       'need_it_now',
       'Kharghar',
       'home_help',
-      'Need help finding a reliable electrician near Kharghar today evening.',
+      'Looking for a reliable electrician in Kharghar for today evening. Any recommendations from locals? Need wiring work done urgently.',
       'active',
       NOW() + INTERVAL '10 hours',
       false
@@ -81,7 +80,7 @@ BEGIN
       'right_now',
       'Kharghar',
       'lost_found',
-      'Starter update: A set of keys was found near a society gate in Kharghar. Reply only if you can identify it.',
+      'Keys found near a society gate in Kharghar — key ring with 3 keys. Reply only if you can describe it. Will hand over to security.',
       'active',
       NOW() + INTERVAL '1 day',
       false

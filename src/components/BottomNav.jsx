@@ -1,6 +1,5 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
 
 const NAV_ITEMS = [
   { path: '/home', icon: '🏠', label: 'Home' },
@@ -13,7 +12,6 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { state } = useApp()
 
   return (
     <nav className="bottom-nav">
@@ -27,7 +25,7 @@ export default function BottomNav() {
               onClick={() => navigate(item.path)}
               aria-label="Create post"
             >
-              <span style={{ fontSize: 28, fontWeight: 300, lineHeight: 1 }}>+</span>
+              <span className="nav-item-post-icon" aria-hidden="true">+</span>
             </button>
           )
         }

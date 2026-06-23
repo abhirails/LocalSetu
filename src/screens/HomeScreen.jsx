@@ -44,8 +44,10 @@ export default function HomeScreen() {
     ? (liveLocality ? `GPS: ${liveLocality}` : 'GPS')
     : activeLocality || state.currentUser?.locality || 'Kharghar'
 
+  const homeArea = state.currentUser?.locality || 'Kharghar'
+
   const liveBadgeLabel = isSupabaseConfigured
-    ? `Live in ${activeLocality === '__gps__' && liveLocality ? liveLocality.split(' ')[0] : (state.currentUser?.locality || 'Kharghar').split(' ')[0]}`
+    ? `Live in ${(effectiveLocality || homeArea).split(',')[0].trim().split(' ').slice(0, 2).join(' ')}`
     : null
 
   const isLocalityFiltered = !!activeLocality
@@ -126,13 +128,17 @@ export default function HomeScreen() {
       )
     }
     if (liveLocality) {
-      const isHome = state.currentUser?.locality?.toLowerCase().includes(liveLocality.toLowerCase())
-        || liveLocality.toLowerCase().includes((state.currentUser?.locality || '').toLowerCase().split(' ')[0])
+      const isHome = matchesLiveLocality(liveLocality, homeArea)
       return (
-        <div style={{ background: 'linear-gradient(90deg, #F0FDF4, #DCFCE7)', borderBottom: '1px solid #BBF7D0', padding: '8px 16px', fontSize: 12, color: '#15803D', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-          <span>Live: <strong>{liveLocality}</strong></span>
-          {isHome && <span style={{ color: '#86EFAC', fontWeight: 400 }}>Home area</span>}
-          <div style={{ flex: 1 }} />
+        <div style={{ background: 'linear-gradient(90deg, #F0FDF4, #DCFCE7)', borderBottom: '1px solid #BBF7D0', padding: '8px 16px', fontSize: 12, color: '#15803D', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, flexWrap: 'wrap' }}>
+          <span>GPS: <strong>{liveLocality}</strong></span>
+          {!isHome && (
+            <span style={{ color: '#166534', fontWeight: 500, opacity: 0.9 }}>
+              · Feed area: <strong>{homeArea}</strong>
+            </span>
+          )}
+          {isHome && <span style={{ color: '#86EFAC', fontWeight: 500 }}>· Home area</span>}
+          <div style={{ flex: 1, minWidth: 8 }} />
           <button onClick={requestLocation} style={{ fontSize: 11, color: '#15803D', fontWeight: 700, textDecoration: 'underline' }}>Refresh</button>
         </div>
       )
