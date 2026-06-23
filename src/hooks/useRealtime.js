@@ -1,12 +1,9 @@
 // LocalSetu — Supabase real-time hook
-// Subscribes to live changes on posts, post_confirmations, and replies.
-// Dispatches to AppContext reducer so the feed updates without a page refresh.
-//
-// Usage: call useRealtime() inside a component that's always mounted (e.g. App.jsx)
-// after the user has logged in. Cleans up subscriptions on unmount.
+// Single source of truth for live feed subscriptions (posts, confirmations, replies, society_posts).
 
 import { useEffect, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { normalizePost, normalizeReply, normalizeSocietyPost } from '../lib/db'
 
 export function useRealtime(dispatch, currentUser) {
   const channelRef = useRef(null)
@@ -14,7 +11,6 @@ export function useRealtime(dispatch, currentUser) {
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUser) return
 
-    // Clean up any existing channel first
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
       channelRef.current = null
@@ -23,27 +19,28 @@ export function useRealtime(dispatch, currentUser) {
     const channel = supabase
       .channel('localsetu-feed')
 
-      // New post created by anyone
       .on('postgres_changes', {
         event:  'INSERT',
         schema: 'public',
         table:  'posts',
       }, (payload) => {
         if (!payload.new) return
-        dispatch({ type: 'REALTIME_NEW_POST', raw: payload.new })
+        const post = normalizePost(payload.new)
+        if (!post) return
+        dispatch({ type: 'REALTIME_NEW_POST', post })
       })
 
-      // Post updated (status change, boost, still_happening count)
       .on('postgres_changes', {
         event:  'UPDATE',
         schema: 'public',
         table:  'posts',
       }, (payload) => {
         if (!payload.new) return
-        dispatch({ type: 'REALTIME_UPDATE_POST', raw: payload.new })
+        const post = normalizePost(payload.new)
+        if (!post) return
+        dispatch({ type: 'REALTIME_UPDATE_POST', post })
       })
 
-      // "Still happening" confirmation added
       .on('postgres_changes', {
         event:  'INSERT',
         schema: 'public',
@@ -53,24 +50,26 @@ export function useRealtime(dispatch, currentUser) {
         dispatch({ type: 'REALTIME_CONFIRMATION', postId: payload.new.post_id, userId: payload.new.user_id })
       })
 
-      // New reply
       .on('postgres_changes', {
         event:  'INSERT',
         schema: 'public',
         table:  'replies',
       }, (payload) => {
         if (!payload.new) return
-        dispatch({ type: 'REALTIME_NEW_REPLY', raw: payload.new })
+        const reply = normalizeReply(payload.new)
+        if (!reply) return
+        dispatch({ type: 'REALTIME_NEW_REPLY', reply })
       })
 
-      // Society post updates (notices, events)
       .on('postgres_changes', {
         event:  'INSERT',
         schema: 'public',
         table:  'society_posts',
       }, (payload) => {
         if (!payload.new) return
-        dispatch({ type: 'REALTIME_NEW_SOCIETY_POST', raw: payload.new })
+        const post = normalizeSocietyPost(payload.new)
+        if (!post) return
+        dispatch({ type: 'REALTIME_NEW_SOCIETY_POST', post })
       })
 
       .subscribe((status) => {
@@ -90,5 +89,5 @@ export function useRealtime(dispatch, currentUser) {
         channelRef.current = null
       }
     }
-  }, [currentUser?.id]) // re-subscribe if user changes
+  }, [currentUser?.id, dispatch])
 }

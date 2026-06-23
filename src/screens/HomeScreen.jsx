@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useCurrentLocation } from '../hooks/useCurrentLocation'
 import { matchesLiveLocality, distanceMeters } from '../lib/geocode'
+import { isSupabaseConfigured } from '../lib/supabase'
 import PostCard from '../components/PostCard'
 import ProviderCard from '../components/ProviderCard'
 import BottomNav from '../components/BottomNav'
@@ -43,6 +44,10 @@ export default function HomeScreen() {
     ? (liveLocality ? `GPS: ${liveLocality}` : 'GPS')
     : activeLocality || state.currentUser?.locality || 'Kharghar'
 
+  const liveBadgeLabel = isSupabaseConfigured
+    ? `Live in ${activeLocality === '__gps__' && liveLocality ? liveLocality.split(' ')[0] : (state.currentUser?.locality || 'Kharghar').split(' ')[0]}`
+    : null
+
   const isLocalityFiltered = !!activeLocality
 
   // ── Locality-aware post filtering ──
@@ -51,7 +56,6 @@ export default function HomeScreen() {
     return matchesLiveLocality(post.locality, effectiveLocality)
   }
 
-  const allActivePosts = helpers.getActivePosts
   const rightNowPosts  = helpers.getActivePosts('right_now').filter(matchesActiveLocality)
   const needItNowPosts = helpers.getActivePosts('need_it_now').filter(matchesActiveLocality)
   const providers = state.providers
@@ -159,7 +163,7 @@ export default function HomeScreen() {
       if (allFeed.length === 0) {
         return (
           <div className="empty-state">
-            <div className="empty-icon">Home</div>
+            <div className="empty-icon">🏠</div>
             <div className="empty-title">Quiet right now</div>
             <div className="empty-sub">Be the first to share a local update in your area.</div>
             <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Post something</button>
@@ -167,21 +171,6 @@ export default function HomeScreen() {
         )
       }
       return (
-        <>
-        {newPostCount > 0 && (
-          <button
-            onClick={() => { actions.clearNewPostCount() }}
-            style={{
-              display: 'block', width: '100%', padding: '10px 16px',
-              background: 'var(--primary)', color: '#fff',
-              border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: 700, textAlign: 'center',
-              position: 'sticky', top: 0, zIndex: 9,
-            }}
-          >
-            ↑ {newPostCount} new post{newPostCount > 1 ? 's' : ''} — tap to see
-          </button>
-        )}
         <div className="card-list">
           {allFeed.map(post =>
             post.societyId
@@ -189,7 +178,6 @@ export default function HomeScreen() {
               : <PostCard key={post.id} post={post} />
           )}
         </div>
-        </>
       )
     }
     if (activeTab === 'right_now') {
@@ -197,7 +185,7 @@ export default function HomeScreen() {
       if (sorted.length === 0) {
         return (
           <div className="empty-state">
-            <div className="empty-icon">Flash</div>
+            <div className="empty-icon">⚡</div>
             <div className="empty-title">No active updates</div>
             <div className="empty-sub">Post a real-time update like traffic, water issues, or power cuts.</div>
             <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Right Now update</button>
@@ -211,7 +199,7 @@ export default function HomeScreen() {
       if (sorted.length === 0) {
         return (
           <div className="empty-state">
-            <div className="empty-icon">Hand</div>
+            <div className="empty-icon">🙋</div>
             <div className="empty-title">No urgent requests</div>
             <div className="empty-sub">Post a local need — borrow, rideshare, or urgent help.</div>
             <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Post a need</button>
@@ -240,7 +228,19 @@ export default function HomeScreen() {
       <div className="screen">
         <div className="header">
           <div>
-            <div className="header-logo">Local<span>Setu</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div className="header-logo">Local<span>Setu</span></div>
+              {liveBadgeLabel && (
+                <span style={{
+                  fontSize: 10, fontWeight: 800, letterSpacing: '0.04em',
+                  textTransform: 'uppercase', color: '#15803D',
+                  background: '#DCFCE7', border: '1px solid #BBF7D0',
+                  borderRadius: 20, padding: '3px 8px',
+                }}>
+                  {liveBadgeLabel}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setShowLocalitySwitcher(true)}
               style={{
@@ -258,10 +258,10 @@ export default function HomeScreen() {
             </button>
           </div>
           <div className="header-actions">
-            <button className="icon-btn" onClick={() => navigate('/profile')} title="Profile">Profile</button>
             {state.currentUser?.role === 'admin' && (
-              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin">Admin</button>
+              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin Dashboard" style={{ fontSize: 20 }}>🛡️</button>
             )}
+            <button className="icon-btn" onClick={() => navigate('/profile')} title="My Profile" style={{ fontSize: 20 }}>👤</button>
           </div>
         </div>
 
@@ -291,28 +291,38 @@ export default function HomeScreen() {
           ))}
         </div>
 
-        <div style={{ background: 'linear-gradient(135deg, var(--primary-light) 0%, #FFF8F5 100%)', padding: '10px 16px', display: 'flex', gap: 16, borderBottom: '1px solid var(--border-light)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--primary)' }}>{rightNowPosts.length}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Live Updates</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--success)' }}>{needItNowPosts.length}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Active Needs</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--navy)' }}>{providers.filter(p => p.isVerified).length}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Verified Helpers</div>
-          </div>
-          <div onClick={() => navigate('/societies')} style={{ textAlign: 'center', cursor: 'pointer' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: '#6366f1' }}>{(state.societies || []).length}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>Societies</div>
-          </div>
-          <div style={{ flex: 1 }} />
-          <button style={{ background: 'var(--primary)', color: 'white', borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, alignSelf: 'center' }}
-            onClick={() => navigate('/create')}>
-            + Post
+        {newPostCount > 0 && (
+          <button
+            onClick={() => { actions.clearNewPostCount(); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            style={{
+              display: 'block', width: '100%', padding: '10px 16px',
+              background: 'var(--primary)', color: '#fff',
+              border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, textAlign: 'center',
+              position: 'sticky', top: 0, zIndex: 9,
+            }}
+          >
+            ↑ {newPostCount} new post{newPostCount > 1 ? 's' : ''} available — tap to refresh
           </button>
+        )}
+
+        <div style={{ background: 'var(--card)', padding: '12px 16px', display: 'flex', gap: 0, borderBottom: '1px solid var(--border-light)', alignItems: 'center' }}>
+          <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-light)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>{rightNowPosts.length}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>Live</div>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-light)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)', lineHeight: 1 }}>{needItNowPosts.length}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>Needs</div>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid var(--border-light)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--navy)', lineHeight: 1 }}>{providers.filter(p => p.isVerified).length}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>Helpers</div>
+          </div>
+          <div onClick={() => navigate('/societies')} style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#6366f1', lineHeight: 1 }}>{(state.societies || []).length}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>Societies</div>
+          </div>
         </div>
 
         {/* Active locality filter banner */}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import CategoryBadge from '../components/CategoryBadge'
 import BottomNav from '../components/BottomNav'
-import { SERVICE_TYPES } from '../data/demoData'
+import { SERVICE_TYPES, CIVIC_SUBCATEGORIES } from '../data/demoData'
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -19,16 +19,19 @@ function getServiceLabel(type) {
 }
 
 const ADMIN_TABS = [
-  { id: 'flagged', label: '🚩 Flagged' },
+  { id: 'flagged',   label: '🚩 Flagged' },
   { id: 'providers', label: '✅ Providers' },
-  { id: 'reports', label: '📋 Reports' },
-  { id: 'stats', label: '📊 Stats' }
+  { id: 'reports',   label: '📋 Reports' },
+  { id: 'civic',     label: '🏗️ Civic' },
+  { id: 'quotes',    label: '🛒 Quotes' },
+  { id: 'stats',     label: '📊 Stats' },
 ]
 
 export default function AdminScreen() {
   const { state, actions, helpers } = useApp()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('flagged')
+  const [civicFilter, setCivicFilter] = useState('all')
 
   const cu = state.currentUser
   if (cu?.role !== 'admin') {
@@ -295,6 +298,198 @@ export default function AdminScreen() {
           </div>
         )}
 
+
+        {/* Civic Issues tab */}
+        {activeTab === 'civic' && (() => {
+          const civicPosts = state.posts.filter(p => p.category === 'civic' && p.status === 'active')
+          const filtered = civicFilter === 'all' ? civicPosts : civicPosts.filter(p => p.civicStatus === civicFilter)
+
+          const exportDigest = () => {
+            const lines = []
+            lines.push('Kharghar Civic Pulse — LocalSetu Weekly Digest')
+            lines.push('Generated: ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
+            lines.push('─────────────────────────────────────────')
+            const grouped = {}
+            civicPosts.forEach(p => {
+              const sub = p.civicSubcategory || 'other'
+              if (!grouped[sub]) grouped[sub] = []
+              grouped[sub].push(p)
+            })
+            Object.keys(grouped).sort().forEach(sub => {
+              const meta = CIVIC_SUBCATEGORIES.find(s => s.id === sub)
+              const label = meta ? `${meta.icon} ${meta.label}` : sub
+              lines.push(`\n${label} (${grouped[sub].length} reports)`)
+              grouped[sub].forEach(p => {
+                lines.push(`  • ${p.locality} — ${p.stillHappeningCount || 0} confirmations — ${p.civicStatus}`)
+              })
+            })
+            lines.push('\n─────────────────────────────────────────')
+            lines.push(`Total reports: ${civicPosts.length}`)
+            lines.push(`Confirmed by locals: ${civicPosts.filter(p => p.civicStatus === 'confirmed_by_locals').length}`)
+            lines.push(`Resolved: ${civicPosts.filter(p => p.civicStatus === 'resolved').length}`)
+
+            const text = lines.join('\n')
+            const blob = new Blob([text], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = 'kharghar-civic-pulse.txt'; a.click()
+            URL.revokeObjectURL(url)
+          }
+
+          return (
+            <div>
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 8px' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  {civicPosts.length} Civic Issue{civicPosts.length !== 1 ? 's' : ''}
+                </div>
+                <button
+                  onClick={exportDigest}
+                  style={{ fontSize: 12, fontWeight: 700, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}
+                >
+                  📥 Export Civic Digest
+                </button>
+              </div>
+
+              {/* Status filter tabs */}
+              <div style={{ display: 'flex', gap: 6, padding: '0 14px 12px', overflowX: 'auto' }}>
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'reported', label: '📋 Reported' },
+                  { id: 'confirmed_by_locals', label: '👥 Confirmed' },
+                  { id: 'resolved', label: '✅ Resolved' },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setCivicFilter(f.id)}
+                    style={{
+                      fontSize: 12, fontWeight: 700, borderRadius: 20, padding: '5px 12px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                      background: civicFilter === f.id ? 'var(--primary)' : 'var(--border)',
+                      color: civicFilter === f.id ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Civic post cards */}
+              {filtered.length === 0 && (
+                <div className="empty-state" style={{ padding: '40px 16px' }}>
+                  <div className="empty-icon">🏗️</div>
+                  <p>No civic issues in this filter</p>
+                </div>
+              )}
+              {filtered.map(post => {
+                const author = state.users.find(u => u.id === post.userId)
+                const sub = CIVIC_SUBCATEGORIES.find(s => s.id === post.civicSubcategory)
+                return (
+                  <div key={post.id} className="admin-post-card" style={{ borderLeft: post.civicStatus === 'resolved' ? '3px solid #22c55e' : post.civicStatus === 'confirmed_by_locals' ? '3px solid #f59e0b' : '3px solid #94a3b8' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <div>
+                        {sub && <span style={{ fontSize: 11, fontWeight: 700, background: '#f0f9ff', color: '#0369a1', borderRadius: 6, padding: '2px 7px', marginRight: 6 }}>{sub.icon} {sub.label}</span>}
+                        <span style={{ fontSize: 11, fontWeight: 700,
+                          background: post.civicStatus === 'resolved' ? '#dcfce7' : post.civicStatus === 'confirmed_by_locals' ? '#fef3c7' : '#f1f5f9',
+                          color: post.civicStatus === 'resolved' ? '#15803d' : post.civicStatus === 'confirmed_by_locals' ? '#92400e' : '#64748b',
+                          borderRadius: 6, padding: '2px 7px'
+                        }}>
+                          {post.civicStatus === 'reported' ? '📋 Reported' : post.civicStatus === 'confirmed_by_locals' ? '👥 Confirmed' : '✅ Resolved'}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{post.locality}</span>
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: '0 0 8px', lineHeight: 1.5 }}>{post.content}</p>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-muted)', alignItems: 'center' }}>
+                      <span>By {author?.name || 'Unknown'}</span>
+                      <span>·</span>
+                      <span>👥 {post.stillHappeningCount || 0} confirmations</span>
+                      {post.civicStatus !== 'resolved' && (
+                        <button
+                          onClick={() => actions.resolveCivicIssue(post.id)}
+                          style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#15803d', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+                        >
+                          ✅ Mark resolved
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+
+        {/* Quotes */}
+        {activeTab === 'quotes' && (() => {
+          const allQuotes = helpers.getAllQuotes()
+          const buyPosts = state.posts.filter(p => p.category === 'need_to_buy' && p.status !== 'removed')
+          return (
+            <div>
+              <div style={{ padding: '10px 14px 4px', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  {allQuotes.length} active quote{allQuotes.length !== 1 ? 's' : ''} across {buyPosts.length} buy request{buyPosts.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+              {buyPosts.length === 0 && (
+                <div className="empty-state">
+                  <div className="empty-icon">🛒</div>
+                  <div className="empty-title">No Need to Buy posts yet</div>
+                  <div className="empty-sub">Users haven't posted any buy requests.</div>
+                </div>
+              )}
+              {buyPosts.map(post => {
+                const postQuotes = helpers.getQuotes(post.id)
+                const author = helpers.getUser(post.userId)
+                return (
+                  <div key={post.id} style={{ margin: '0 14px 14px', background: 'var(--card)', borderRadius: 'var(--radius)', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+                    <div style={{ background: '#fff8f0', padding: '10px 14px', borderBottom: '1px solid #fde8d5' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: '#c2410c' }}>🛒 {post.needToBuyItem || 'Buy Request'}</div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <span style={{ fontSize: 11, background: postQuotes.length > 0 ? '#dcfce7' : '#f1f5f9', color: postQuotes.length > 0 ? '#15803d' : '#64748b', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>
+                            {postQuotes.length} quote{postQuotes.length !== 1 ? 's' : ''}
+                          </span>
+                          {post.isBought && <span style={{ fontSize: 11, background: '#dcfce7', color: '#15803d', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>✓ Bought</span>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                        By {author?.name || 'Unknown'} · {post.locality} · Budget {post.budget ? `≤ ₹${post.budget}` : 'not set'}
+                      </div>
+                    </div>
+                    {postQuotes.length === 0 ? (
+                      <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-muted)' }}>No quotes submitted yet.</div>
+                    ) : (
+                      postQuotes.map(q => (
+                        <div key={q.id} style={{ padding: '10px 14px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>{q.shopName}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                              ₹{q.price}
+                              {q.deliveryTime ? ` · Delivery ${q.deliveryTime}min` : ''}
+                              {q.deliveryCharge > 0 ? ` (₹${q.deliveryCharge})` : q.deliveryAvailable ? ' (free delivery)' : ''}
+                              {q.pickupAvailable ? ' · Pickup ✓' : ''}
+                            </div>
+                            {q.message && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>"{q.message}"</div>}
+                            {post.selectedQuoteId === q.id && (
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: 4, padding: '1px 6px' }}>✅ Selected by buyer</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => { if (window.confirm('Remove this quote?')) actions.adminRemoveQuote(q.id) }}
+                            style={{ fontSize: 11, color: 'var(--error)', background: 'var(--error-light)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}
+                          >
+                            🗑️ Remove
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+
         {/* Stats */}
         {activeTab === 'stats' && (
           <div>
@@ -329,7 +524,7 @@ export default function AdminScreen() {
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 10 }}>
                 Posts by Category
               </div>
-              {['water', 'power', 'traffic', 'transport', 'police', 'weather', 'safety', 'civic'].map(cat => {
+              {['water', 'power', 'traffic', 'transport', 'police', 'weather', 'safety', 'civic', 'medical'].map(cat => {
                 const count = state.posts.filter(p => p.category === cat && p.status === 'active').length
                 if (count === 0) return null
                 return (
@@ -351,7 +546,8 @@ export default function AdminScreen() {
                   • Daily active posters: <strong>15+</strong><br/>
                   • Posts per day (organic): <strong>5+</strong><br/>
                   • Avg replies per post: <strong>2+</strong><br/>
-                  • Report rate: <strong>&lt; 5%</strong>
+                  • Report rate: <strong>&lt; 5%</strong><br/>
+                  • Medical posts: <strong>{state.posts.filter(p => p.category === 'medical').length} active</strong>
                 </div>
               </div>
             </div>

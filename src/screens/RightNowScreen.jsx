@@ -123,7 +123,7 @@ export default function RightNowScreen() {
 
         {sorted.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">All clear!</div>
+            <div className="empty-icon">📡</div>
             <div className="empty-title">No active updates right now</div>
             <div className="empty-sub">
               No active {activeCategory !== 'all' ? activeCategory + ' ' : ''}updates.

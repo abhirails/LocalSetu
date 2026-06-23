@@ -2,7 +2,10 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback, u
 import { useRealtime } from '../hooks/useRealtime'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import * as db from '../lib/db'
-import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS, DEMO_BUSINESSES, DEMO_RSVPS, DEMO_MAINTENANCE_RECORDS, DEMO_COMPLAINTS } from '../data/demoData'
+import { updateCivicStatus as dbUpdateCivicStatus } from '../lib/db'
+import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS, DEMO_BUSINESSES, DEMO_RSVPS, DEMO_MAINTENANCE_RECORDS, DEMO_COMPLAINTS, DEMO_CIVIC_POSTS, DEMO_BUY_POSTS, DEMO_QUOTES, DEMO_MEDICAL_POSTS, DEMO_MEDICAL_PROVIDERS, DEMO_MEDICAL_BUSINESSES,
+  DEMO_EDUCATION_PROVIDERS, DEMO_EDUCATION_BUSINESSES,
+  DEMO_WELLNESS_PROVIDERS, DEMO_WELLNESS_BUSINESSES } from '../data/demoData'
 
 const AppContext = createContext(null)
 
@@ -18,33 +21,40 @@ function loadLocalState() {
   return null
 }
 
-function initDemoState() {
-  const saved = loadLocalState()
-  if (saved) return { ...saved, loading: false, toast: null }
+function createDefaultState() {
   return {
     currentUser: null,
     users: DEMO_USERS,
-    posts: DEMO_POSTS,
-    providers: DEMO_PROVIDERS,
+    posts: [...DEMO_POSTS, ...DEMO_CIVIC_POSTS, ...DEMO_BUY_POSTS, ...DEMO_MEDICAL_POSTS],
+    providers: [...DEMO_PROVIDERS, ...DEMO_MEDICAL_PROVIDERS, ...DEMO_EDUCATION_PROVIDERS, ...DEMO_WELLNESS_PROVIDERS],
     replies: DEMO_REPLIES,
     reports: DEMO_REPORTS,
     savedPostIds: [],
     societies: DEMO_SOCIETIES,
     societyPosts: DEMO_SOCIETY_POSTS,
     societyMembers: DEMO_SOCIETY_MEMBERS,
-    businesses: DEMO_BUSINESSES,
+    businesses: [...DEMO_BUSINESSES, ...DEMO_MEDICAL_BUSINESSES, ...DEMO_EDUCATION_BUSINESSES, ...DEMO_WELLNESS_BUSINESSES],
     rsvps: DEMO_RSVPS,
     maintenanceRecords: DEMO_MAINTENANCE_RECORDS,
     complaints: DEMO_COMPLAINTS,
+    quotes: DEMO_QUOTES,
     liveLocality: null,
     liveCoords: null,
     locationStatus: 'idle',
     radiusFilter: null,
     activeLocality: null,
     savedLocalities: [],
+    newPostCount: 0,
     loading: false,
     toast: null
   }
+}
+
+function initDemoState() {
+  const defaults = createDefaultState()
+  const saved = loadLocalState()
+  if (saved) return { ...defaults, ...saved, loading: false, toast: null }
+  return defaults
 }
 
 // ────────────────────────────────────────────────────────────
@@ -280,6 +290,47 @@ function reducer(state, action) {
         )
       }
 
+    // ── Phase 6.5: Civic Status ──
+    case 'UPDATE_CIVIC_STATUS':
+      return {
+        ...state,
+        posts: state.posts.map(p =>
+          p.id === action.postId
+            ? { ...p, civicStatus: action.civicStatus }
+            : p
+        )
+      }
+
+    // ── Phase 6.6: Quotes ──
+    case 'ADD_QUOTE':
+      return { ...state, quotes: [action.quote, ...state.quotes] }
+
+    case 'REMOVE_QUOTE':
+      return {
+        ...state,
+        quotes: state.quotes.map(q =>
+          q.id === action.quoteId ? { ...q, isRemoved: true } : q
+        )
+      }
+
+    case 'SELECT_QUOTE':
+      return {
+        ...state,
+        posts: state.posts.map(p =>
+          p.id === action.postId ? { ...p, selectedQuoteId: action.quoteId } : p
+        )
+      }
+
+    case 'MARK_BOUGHT':
+      return {
+        ...state,
+        posts: state.posts.map(p =>
+          p.id === action.postId
+            ? { ...p, isBought: true, isFulfilled: true, status: 'fulfilled' }
+            : p
+        )
+      }
+
     // ── Toast ──
     case 'SET_TOAST':
       return { ...state, toast: action.message }
@@ -319,66 +370,40 @@ function reducer(state, action) {
 
     // ── Real-time feed updates ──
     case 'REALTIME_NEW_POST': {
-      const raw = action.raw
-      // Normalize minimal fields — full fetch not needed for feed display
-      const newPost = {
-        id: raw.id, type: raw.type, userId: raw.user_id, locality: raw.locality,
-        category: raw.category, content: raw.content, status: raw.status,
-        expiresAt: raw.expires_at, isPinned: raw.is_pinned, reportCount: raw.report_count,
-        createdAt: raw.created_at, stillHappeningCount: raw.still_happening_count || 0,
-        lastConfirmedAt: raw.last_confirmed_at, confirmedBy: [],
-        neededBy: raw.needed_by, distanceRange: raw.distance_range,
-        helperCount: raw.helper_count || 0, isFulfilled: raw.is_fulfilled || false,
-        isBoosted: raw.is_boosted || false, boostedUntil: raw.boosted_until || null,
-        author: null,
-      }
-      // Avoid duplicate if we already have it
-      if (state.posts.find(p => p.id === newPost.id)) return state
+      const newPost = action.post
+      if (!newPost || state.posts.find(p => p.id === newPost.id)) return state
       return { ...state, posts: [newPost, ...state.posts], newPostCount: (state.newPostCount || 0) + 1 }
     }
     case 'REALTIME_UPDATE_POST': {
-      const raw = action.raw
+      const updated = action.post
+      if (!updated) return state
       return {
         ...state,
-        posts: state.posts.map(p => p.id === raw.id ? {
-          ...p,
-          status:               raw.status,
-          isBoosted:            raw.is_boosted ?? p.isBoosted,
-          boostedUntil:         raw.boosted_until ?? p.boostedUntil,
-          stillHappeningCount:  raw.still_happening_count ?? p.stillHappeningCount,
-          helperCount:          raw.helper_count ?? p.helperCount,
-          isFulfilled:          raw.is_fulfilled ?? p.isFulfilled,
-        } : p)
+        posts: state.posts.map(p => p.id === updated.id ? { ...p, ...updated } : p)
       }
     }
     case 'REALTIME_CONFIRMATION': {
       return {
         ...state,
-        posts: state.posts.map(p => p.id === action.postId && !p.confirmedBy.includes(action.userId) ? {
-          ...p,
-          stillHappeningCount: p.stillHappeningCount + 1,
-          confirmedBy: [...p.confirmedBy, action.userId],
-        } : p)
+        posts: (state.posts || []).map(p => {
+          const confirmedBy = p.confirmedBy || []
+          if (p.id !== action.postId || confirmedBy.includes(action.userId)) return p
+          return {
+            ...p,
+            stillHappeningCount: (p.stillHappeningCount || 0) + 1,
+            confirmedBy: [...confirmedBy, action.userId],
+          }
+        })
       }
     }
     case 'REALTIME_NEW_REPLY': {
-      const raw = action.raw
-      const newReply = {
-        id: raw.id, postId: raw.post_id, userId: raw.user_id,
-        content: raw.content, createdAt: raw.created_at, isHidden: raw.is_hidden || false,
-      }
-      if (state.replies.find(r => r.id === newReply.id)) return state
+      const newReply = action.reply
+      if (!newReply || state.replies.find(r => r.id === newReply.id)) return state
       return { ...state, replies: [newReply, ...state.replies] }
     }
     case 'REALTIME_NEW_SOCIETY_POST': {
-      const raw = action.raw
-      if (!raw.pin_to_feed) return state  // members-only posts don't appear in feed
-      const sp = {
-        id: raw.id, societyId: raw.society_id, postedBy: raw.posted_by, type: raw.type,
-        title: raw.title, content: raw.content, eventDate: raw.event_date,
-        eventLocation: raw.event_location, status: raw.status, pinToFeed: raw.pin_to_feed,
-        visibility: raw.visibility || 'public', createdAt: raw.created_at,
-      }
+      const sp = action.post
+      if (!sp?.pinToFeed || (sp.visibility && sp.visibility !== 'public')) return state
       if (state.societyPosts.find(p => p.id === sp.id)) return state
       return { ...state, societyPosts: [sp, ...state.societyPosts] }
     }
@@ -397,7 +422,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, () =>
     isSupabaseConfigured
-      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], businesses: [], rsvps: [], maintenanceRecords: [], complaints: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
+      ? { currentUser: null, posts: [], providers: [], replies: [], reports: [], savedPostIds: [], societies: [], societyPosts: [], societyMembers: [], businesses: [], rsvps: [], maintenanceRecords: [], complaints: [], quotes: [], liveLocality: null, liveCoords: null, locationStatus: 'idle', radiusFilter: null, activeLocality: null, savedLocalities: [], loading: true, toast: null }
       : initDemoState()
   )
 
@@ -456,6 +481,7 @@ export function AppProvider({ children }) {
         }
       } catch (err) {
         console.error('LocalSetu: failed to load data', err)
+      } finally {
         dispatch({ type: 'SET_LOADING', value: false })
       }
     }
@@ -483,42 +509,6 @@ export function AppProvider({ children }) {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  // ── SUPABASE MODE: Real-time subscriptions ──
-  useEffect(() => {
-    if (!isSupabaseConfigured || !state.currentUser) return
-
-    const channel = supabase
-      .channel('localsetu-realtime')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts' },
-        (payload) => {
-          // Avoid duplicating optimistic inserts from the current user
-          const exists = state.posts.some(p => p.id === payload.new.id)
-          if (!exists) {
-            dispatch({ type: "ADD_POST", post: payload.new })
-          }
-        }
-      )
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'posts' },
-        (payload) => {
-          dispatch({ type: 'UPDATE_POST', post: { id: payload.new.id, ...payload.new } })
-        }
-      )
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'replies' },
-        (payload) => {
-          const exists = state.replies.some(r => r.id === payload.new.id)
-          if (!exists) {
-            dispatch({ type: 'ADD_REPLY', reply: { ...payload.new, postId: payload.new.post_id, userId: payload.new.user_id, replyType: payload.new.reply_type, createdAt: payload.new.created_at } })
-          }
-        }
-      )
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
-  }, [state.currentUser?.id])
 
   // ────────────────────────────────────────────────────────
 
@@ -1024,6 +1014,86 @@ export function AppProvider({ children }) {
       }
     },
 
+    // Phase 6.5 — Civic actions
+    confirmCivicIssue: async (postId) => {
+      const userId = state.currentUser?.id
+      if (!userId) return
+      const post = state.posts.find(p => p.id === postId)
+      if (!post || post.confirmedBy?.includes(userId)) return
+      // Optimistic: increment still-happening + possibly update civic status
+      const newCount = (post.stillHappeningCount || 0) + 1
+      const newCivicStatus = newCount >= 5 ? 'confirmed_by_locals' : post.civicStatus
+      dispatch({ type: 'CONFIRM_STILL_HAPPENING', postId, userId })
+      if (newCivicStatus !== post.civicStatus) {
+        dispatch({ type: 'UPDATE_CIVIC_STATUS', postId, civicStatus: newCivicStatus })
+      }
+      if (isSupabaseConfigured && state.currentUser) {
+        await db.confirmStillHappening(postId, userId).catch(console.error)
+        if (newCivicStatus !== post.civicStatus) {
+          await dbUpdateCivicStatus(postId, newCivicStatus).catch(console.error)
+        }
+      }
+    },
+
+    resolveCivicIssue: async (postId) => {
+      dispatch({ type: 'UPDATE_CIVIC_STATUS', postId, civicStatus: 'resolved' })
+      toast('Marked as resolved ✅')
+      if (isSupabaseConfigured) {
+        await dbUpdateCivicStatus(postId, 'resolved').catch(console.error)
+      }
+    },
+
+    // ── Phase 6.6: Quotes (Need to Buy) ──
+
+    submitQuote: async (postId, quoteData) => {
+      const userId = state.currentUser?.id
+      if (!userId) return
+      const optimistic = {
+        ...quoteData,
+        id: 'opt_q_' + Date.now(),
+        postId,
+        submittedBy: userId,
+        isRemoved: false,
+        createdAt: new Date().toISOString(),
+      }
+      dispatch({ type: 'ADD_QUOTE', quote: optimistic })
+      toast('Quote submitted!')
+      if (isSupabaseConfigured) {
+        try {
+          const real = await db.submitQuote(postId, userId, quoteData)
+          // Replace optimistic with real
+          dispatch({ type: 'REMOVE_QUOTE', quoteId: optimistic.id })
+          dispatch({ type: 'ADD_QUOTE', quote: real })
+        } catch (err) {
+          console.error('LocalSetu: submitQuote failed', err)
+        }
+      }
+    },
+
+    selectQuote: async (postId, quoteId) => {
+      dispatch({ type: 'SELECT_QUOTE', postId, quoteId })
+      toast('Quote selected! Contact the shop.')
+      if (isSupabaseConfigured) {
+        await db.selectQuote(postId, quoteId).catch(console.error)
+      }
+    },
+
+    markAsBought: async (postId) => {
+      dispatch({ type: 'MARK_BOUGHT', postId })
+      toast('Great! Marked as bought ✅')
+      if (isSupabaseConfigured) {
+        await db.markPostBought(postId).catch(console.error)
+      }
+    },
+
+    adminRemoveQuote: async (quoteId) => {
+      dispatch({ type: 'REMOVE_QUOTE', quoteId })
+      toast('Quote removed.')
+      if (isSupabaseConfigured) {
+        await db.adminRemoveQuote(quoteId).catch(console.error)
+      }
+    },
+
     setLiveLocality: (locality, coords, status = 'granted') => {
       dispatch({ type: 'SET_LIVE_LOCALITY', locality, coords, status })
     },
@@ -1074,15 +1144,15 @@ export function AppProvider({ children }) {
       return (state.users || []).find(u => u.id === id) || null
     },
     getReplies: (postId) =>
-      state.replies
+      (state.replies || [])
         .filter(r => r.postId === postId)
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
 
-    isPostSaved: (postId) => state.savedPostIds.includes(postId),
+    isPostSaved: (postId) => (state.savedPostIds || []).includes(postId),
     isBlocked: (userId) => state.currentUser?.blockedUsers?.includes(userId) || false,
 
     getActivePosts: (type) =>
-      state.posts
+      (state.posts || [])
         .filter(p => {
           if (type && p.type !== type) return false
           if (p.status === 'removed') return false
@@ -1172,6 +1242,19 @@ export function AppProvider({ children }) {
     getSocietyMembersList: (societyId) =>
       (state.societyMembers || []).filter(m => m.societyId === societyId),
 
+    getQuotes: (postId) =>
+      (state.quotes || [])
+        .filter(q => q.postId === postId && !q.isRemoved)
+        .sort((a, b) => a.price - b.price),
+
+    getSelectedQuote: (postId) => {
+      const post = state.posts.find(p => p.id === postId)
+      if (!post?.selectedQuoteId) return null
+      return (state.quotes || []).find(q => q.id === post.selectedQuoteId) || null
+    },
+
+    getAllQuotes: () => (state.quotes || []).filter(q => !q.isRemoved),
+
     getPendingMemberships: (societyId) =>
       (state.societyMembers || []).filter(m => m.societyId === societyId && m.status === 'pending'),
 
@@ -1182,13 +1265,10 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{ state, actions, helpers, isSupabaseConfigured }}>
       {children}
-      {state.toast && <div className="toast">{state.toast}</div>}
     </AppContext.Provider>
   )
 }
 
 export function useApp() {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useApp must be used within AppProvider')
-  return ctx
+  return useContext(AppContext)
 }

@@ -371,7 +371,7 @@ export async function updateSavedLocalities(userId, savedLocalities) {
   return normalizeProfile(data)
 }
 
-function normalizePost(p) {
+export function normalizePost(p) {
   if (!p) return null
   return {
     id:                   p.id,
@@ -397,6 +397,10 @@ function normalizePost(p) {
     // Phase 4 — Boost
     isBoosted:            p.is_boosted ?? false,
     boostedUntil:         p.boosted_until ?? null,
+    // Phase 6.5 — Civic
+    civicSubcategory:     p.civic_subcategory ?? null,
+    civicStatus:          p.civic_status ?? 'reported',
+    medicalSubcategory:   p.medical_subcategory ?? null,
     // Joined author
     author:               p.profiles ? normalizeProfile(p.profiles) : null
   }
@@ -420,7 +424,7 @@ function normalizeProvider(p) {
   }
 }
 
-function normalizeReply(r) {
+export function normalizeReply(r) {
   if (!r) return null
   return {
     id:         r.id,
@@ -442,13 +446,14 @@ export function normalizeSociety(s) {
   return {
     id:           s.id,
     name:         s.name,
+    locality:     s.locality,
     sector:       s.sector,
     landmark:     s.landmark,
     description:  s.description,
     rules:        s.rules,
-    contactPhone: s.contact_phone,
+    contactPhone: s.contact_phone ?? s.public_contact,
     totalFlats:   s.total_flats,
-    adminId:      s.admin_id,
+    adminId:      s.admin_id ?? s.admin_user_id,
     isVerified:   s.is_verified,
     isPro:        s.is_pro ?? s.isPro ?? false,
     proExpiresAt: s.pro_expires_at ?? s.proExpiresAt ?? null,
@@ -461,14 +466,14 @@ export function normalizeSocietyPost(p) {
   return {
     id:            p.id,
     societyId:     p.society_id,
-    postedBy:      p.posted_by,
+    postedBy:      p.posted_by ?? p.author_id ?? p.user_id,
     type:          p.type,
     title:         p.title,
-    content:       p.content,
-    eventDate:     p.event_date,
+    content:       p.content ?? p.body,
+    eventDate:     p.event_date ?? p.event_at,
     eventLocation: p.event_location,
-    status:        p.status,
-    pinToFeed:     p.pin_to_feed,
+    status:        p.status ?? 'active',
+    pinToFeed:     p.pin_to_feed ?? p.is_pinned ?? false,
     visibility:    p.visibility || 'public',
     createdAt:     p.created_at,
     society:       p.societies ? normalizeSociety(p.societies) : null
@@ -488,11 +493,12 @@ export async function getFeedSocietyPosts() {
   const { data, error } = await supabase
     .from('society_posts')
     .select('*, societies(name, sector)')
-    .eq('pin_to_feed', true)
-    .eq('status', 'active')
+    .or('pin_to_feed.eq.true,is_pinned.eq.true')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return (data || []).map(normalizeSocietyPost)
+  return (data || [])
+    .map(normalizeSocietyPost)
+    .filter(p => p.status !== 'removed' && p.pinToFeed)
 }
 
 export async function getSocietyPosts(societyId) {
@@ -500,28 +506,35 @@ export async function getSocietyPosts(societyId) {
     .from('society_posts')
     .select('*')
     .eq('society_id', societyId)
-    .neq('status', 'removed')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return (data || []).map(normalizeSocietyPost)
+  return (data || [])
+    .map(normalizeSocietyPost)
+    .filter(p => p.status !== 'removed')
 }
 
 export async function createSocietyPost(societyId, userId, postData) {
   const visibility = postData.visibility || 'public'
+  const pinFeed = visibility === 'public' ? (postData.pinToFeed ?? true) : false
+  const row = {
+    society_id:     societyId,
+    author_id:      userId,
+    posted_by:      userId,
+    type:           postData.type,
+    title:          postData.title,
+    body:           postData.content,
+    content:        postData.content,
+    event_date:     postData.eventDate || null,
+    event_at:       postData.eventDate || null,
+    event_location: postData.eventLocation || null,
+    status:         'active',
+    is_pinned:      pinFeed,
+    pin_to_feed:    pinFeed,
+    visibility,
+  }
   const { data, error } = await supabase
     .from('society_posts')
-    .insert({
-      society_id:     societyId,
-      posted_by:      userId,
-      type:           postData.type,
-      title:          postData.title,
-      content:        postData.content,
-      event_date:     postData.eventDate || null,
-      event_location: postData.eventLocation || null,
-      status:         'active',
-      pin_to_feed:    visibility === 'public' ? (postData.pinToFeed ?? true) : false,
-      visibility
-    })
+    .insert(row)
     .select()
     .single()
   if (error) throw error
@@ -530,8 +543,11 @@ export async function createSocietyPost(societyId, userId, postData) {
 
 export async function updateSocietyPost(id, updates) {
   const dbUpdates = {}
-  if (updates.status !== undefined)    dbUpdates.status = updates.status
-  if (updates.pinToFeed !== undefined) dbUpdates.pin_to_feed = updates.pinToFeed
+  if (updates.status !== undefined)     dbUpdates.status = updates.status
+  if (updates.pinToFeed !== undefined) {
+    dbUpdates.pin_to_feed = updates.pinToFeed
+    dbUpdates.is_pinned = updates.pinToFeed
+  }
   if (updates.visibility !== undefined) dbUpdates.visibility = updates.visibility
   const { data, error } = await supabase
     .from('society_posts')
@@ -555,9 +571,10 @@ export function normalizeMember(m) {
     userId:      m.user_id,
     role:        m.role,
     status:      m.status,
-    requestedAt: m.requested_at,
-    reviewedAt:  m.reviewed_at,
-    reviewedBy:  m.reviewed_by,
+    flatNo:      m.flat_no ?? m.flat_number,
+    requestedAt: m.requested_at ?? m.created_at,
+    reviewedAt:  m.reviewed_at ?? m.approved_at,
+    reviewedBy:  m.reviewed_by ?? m.approved_by,
     profile:     m.profiles ? normalizeProfile(m.profiles) : null
   }
 }
@@ -567,7 +584,7 @@ export async function getSocietyMembers(societyId) {
     .from('society_members')
     .select('*, profiles(id, name, locality, is_verified, trust_score)')
     .eq('society_id', societyId)
-    .order('requested_at', { ascending: false })
+    .order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map(normalizeMember)
 }
@@ -584,7 +601,13 @@ export async function getUserMemberships(userId) {
 export async function requestJoinSociety(userId, societyId) {
   const { data, error } = await supabase
     .from('society_members')
-    .insert({ user_id: userId, society_id: societyId, status: 'pending', role: 'resident' })
+    .insert({
+      user_id: userId,
+      society_id: societyId,
+      status: 'pending',
+      role: 'member',
+      requested_at: new Date().toISOString(),
+    })
     .select()
     .single()
   if (error) throw error
@@ -592,9 +615,16 @@ export async function requestJoinSociety(userId, societyId) {
 }
 
 export async function approveSocietyMember(memberId, reviewedById) {
+  const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('society_members')
-    .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: reviewedById })
+    .update({
+      status: 'approved',
+      reviewed_at: now,
+      reviewed_by: reviewedById,
+      approved_at: now,
+      approved_by: reviewedById,
+    })
     .eq('id', memberId)
     .select()
     .single()
@@ -603,9 +633,16 @@ export async function approveSocietyMember(memberId, reviewedById) {
 }
 
 export async function rejectSocietyMember(memberId, reviewedById) {
+  const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('society_members')
-    .update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: reviewedById })
+    .update({
+      status: 'rejected',
+      reviewed_at: now,
+      reviewed_by: reviewedById,
+      approved_at: now,
+      approved_by: reviewedById,
+    })
     .eq('id', memberId)
     .select()
     .single()
@@ -869,4 +906,100 @@ export async function updateComplaint(id, updates) {
     .single()
   if (error) throw error
   return normalizeComplaint(data)
+}
+
+// ─── Phase 6.5: Civic status update ─────────────────────────────────────────
+
+export async function updateCivicStatus(postId, civicStatus) {
+  const { data, error } = await supabase
+    .from('posts')
+    .update({ civic_status: civicStatus })
+    .eq('id', postId)
+    .select()
+    .single()
+  if (error) throw error
+  return normalizePost(data)
+}
+
+
+// ============================================================
+// Phase 6.6 — Quotes (Need to Buy)
+// ============================================================
+
+export function normalizeQuote(q) {
+  return {
+    id:                q.id,
+    postId:            q.post_id,
+    submittedBy:       q.submitted_by,
+    shopName:          q.shop_name,
+    shopCategory:      q.shop_category ?? null,
+    price:             q.price,
+    deliveryTime:      q.delivery_time ?? null,
+    deliveryCharge:    q.delivery_charge ?? 0,
+    pickupAvailable:   q.pickup_available ?? false,
+    deliveryAvailable: q.delivery_available ?? true,
+    paymentMode:       q.payment_mode ?? 'both',
+    message:           q.message ?? '',
+    isAvailable:       q.is_available ?? 'yes',
+    isRemoved:         q.is_removed ?? false,
+    createdAt:         q.created_at,
+  }
+}
+
+export async function getQuotesForPost(postId) {
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('post_id', postId)
+    .eq('is_removed', false)
+    .order('price', { ascending: true })
+  if (error) throw error
+  return (data || []).map(normalizeQuote)
+}
+
+export async function submitQuote(postId, userId, quoteData) {
+  const { data, error } = await supabase
+    .from('quotes')
+    .insert({
+      post_id:           postId,
+      submitted_by:      userId,
+      shop_name:         quoteData.shopName,
+      shop_category:     quoteData.shopCategory || null,
+      price:             quoteData.price,
+      delivery_time:     quoteData.deliveryTime || null,
+      delivery_charge:   quoteData.deliveryCharge || 0,
+      pickup_available:  quoteData.pickupAvailable || false,
+      delivery_available: quoteData.deliveryAvailable !== false,
+      payment_mode:      quoteData.paymentMode || 'both',
+      message:           quoteData.message || '',
+      is_available:      quoteData.isAvailable || 'yes',
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return normalizeQuote(data)
+}
+
+export async function selectQuote(postId, quoteId) {
+  const { error } = await supabase
+    .from('posts')
+    .update({ selected_quote_id: quoteId })
+    .eq('id', postId)
+  if (error) throw error
+}
+
+export async function markPostBought(postId) {
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_bought: true, is_fulfilled: true, status: 'fulfilled' })
+    .eq('id', postId)
+  if (error) throw error
+}
+
+export async function adminRemoveQuote(quoteId) {
+  const { error } = await supabase
+    .from('quotes')
+    .update({ is_removed: true })
+    .eq('id', quoteId)
+  if (error) throw error
 }

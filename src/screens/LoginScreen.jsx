@@ -103,7 +103,7 @@ export default function LoginScreen() {
     <div className="app-container">
       <div className="login-screen">
         <div className="login-hero">
-          <div className="login-logo">LocalSetu</div>
+          <div className="login-logo">Local<span>Setu</span></div>
           <div className="login-tagline">Real help and updates from people near you. Kharghar se shuru karo.</div>
           {isSupabaseConfigured && (
             <div style={{ marginTop: 12, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Secured by Supabase</div>

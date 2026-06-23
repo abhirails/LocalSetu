@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import CategoryBadge from '../components/CategoryBadge'
+import { SHOP_CATEGORIES } from '../data/demoData'
 import BottomNav from '../components/BottomNav'
 
 function timeAgo(dateStr) {
@@ -48,6 +49,16 @@ export default function PostDetailScreen() {
   const [replyText, setReplyText] = useState('')
   const [showSafety, setShowSafety] = useState(false)
   const [shareFeedback, setShareFeedback] = useState('')
+  const [showQuoteForm, setShowQuoteForm] = useState(false)
+  const [qShopName, setQShopName] = useState('')
+  const [qShopCat, setQShopCat] = useState('')
+  const [qPrice, setQPrice] = useState('')
+  const [qDeliveryTime, setQDeliveryTime] = useState('')
+  const [qDeliveryCharge, setQDeliveryCharge] = useState('0')
+  const [qPickup, setQPickup] = useState(false)
+  const [qDelivery, setQDelivery] = useState(true)
+  const [qPayment, setQPayment] = useState('both')
+  const [qMessage, setQMessage] = useState('')
 
   const post = helpers.getPost(id)
   const replies = helpers.getReplies(id)
@@ -55,7 +66,31 @@ export default function PostDetailScreen() {
   const isLoggedIn = !!state.currentUser
   const isSaved = helpers.isPostSaved(id)
   const alreadyConfirmed = post?.confirmedBy?.includes(state.currentUser?.id)
+
+  const quotes = post ? helpers.getQuotes(post.id) : []
+  const selectedQuote = post ? helpers.getSelectedQuote(post.id) : null
   const isMyPost = state.currentUser?.id === post?.userId
+  const isAdmin = state.currentUser?.role === 'admin'
+  const canSubmitQuote = isLoggedIn && post?.category === 'need_to_buy' && !post?.isBought && !quotes.find(q => q.submittedBy === state.currentUser?.id)
+
+  const submitQuote = () => {
+    if (!qShopName.trim() || !qPrice) return
+    actions.submitQuote(post.id, {
+      shopName:          qShopName.trim(),
+      shopCategory:      qShopCat || null,
+      price:             parseInt(qPrice),
+      deliveryTime:      qDeliveryTime ? parseInt(qDeliveryTime) : null,
+      deliveryCharge:    parseInt(qDeliveryCharge) || 0,
+      pickupAvailable:   qPickup,
+      deliveryAvailable: qDelivery,
+      paymentMode:       qPayment,
+      message:           qMessage.trim(),
+      isAvailable:       'yes',
+    })
+    setShowQuoteForm(false)
+    setQShopName(''); setQShopCat(''); setQPrice(''); setQDeliveryTime('')
+    setQDeliveryCharge('0'); setQPickup(false); setQDelivery(true); setQPayment('both'); setQMessage('')
+  }
 
   const goBack = () => { if (window.history.length > 1) navigate(-1); else navigate('/home') }
 
@@ -75,7 +110,7 @@ export default function PostDetailScreen() {
             <span /><span />
           </div>
           <div className="empty-state">
-            <div className="empty-icon">Search</div>
+            <div className="empty-icon">🔍</div>
             <div className="empty-title">Post not found</div>
             <div className="empty-sub">This post may have been removed or expired.</div>
             {!isLoggedIn && (
@@ -209,7 +244,7 @@ export default function PostDetailScreen() {
           </div>
         </div>
 
-        {(post.type === 'need_it_now' || showSafety) && (
+        {(post.type === 'need_it_now' || showSafety) && post.category !== 'need_to_buy' && (
           <div style={{ padding: '0 16px 4px' }}>
             <div className="safety-box">
               <div className="safety-title">Safety First</div>
@@ -220,6 +255,186 @@ export default function PostDetailScreen() {
                 <li>Use caution when meeting strangers.</li>
               </ul>
             </div>
+          </div>
+        )}
+
+        {/* ── Need to Buy: Quotes Section ── */}
+        {post.category === 'need_to_buy' && (
+          <div style={{ padding: '0 16px 8px' }}>
+
+            {/* Need to Buy detail strip */}
+            <div style={{ background: '#fff8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
+              <div style={{ fontWeight: 800, color: '#c2410c', marginBottom: 4 }}>🛒 Need to Buy</div>
+              {post.needToBuyItem && <div style={{ color: 'var(--text-primary)' }}>Item: <strong>{post.needToBuyItem}</strong>{post.needToBuyQty ? ` · Qty: ${post.needToBuyQty}` : ''}</div>}
+              <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>
+                {post.deliveryPref === 'delivery' ? 'Delivery preferred' : post.deliveryPref === 'pickup' ? 'Pickup only' : 'Delivery or pickup'}
+                {post.budget ? ` · Budget ≤ ₹${post.budget}` : ''}
+              </div>
+            </div>
+
+            {/* Safety warning */}
+            <div className="safety-box" style={{ marginBottom: 12 }}>
+              <div className="safety-title">⚠️ Safety Reminder</div>
+              <ul className="safety-list">
+                <li>Verify items and shop identity before paying.</li>
+                <li>Prefer UPI/cash only after confirming shop location.</li>
+                <li>Do not share OTP, bank details, or exact home address.</li>
+                <li>Pick up from the shop or meet in public where possible.</li>
+              </ul>
+            </div>
+
+            {/* Quotes header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                {quotes.length} Quote{quotes.length !== 1 ? 's' : ''}
+              </div>
+              {isLoggedIn && canSubmitQuote && !showQuoteForm && (
+                <button
+                  onClick={() => setShowQuoteForm(true)}
+                  style={{ fontSize: 12, fontWeight: 700, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}
+                >
+                  + Submit Quote
+                </button>
+              )}
+            </div>
+
+            {/* Submit Quote Form */}
+            {showQuoteForm && isLoggedIn && (
+              <div style={{ background: 'var(--card)', borderRadius: 'var(--radius)', border: '1.5px solid var(--primary)', padding: 14, marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10, color: 'var(--primary)' }}>📦 Your Quote</div>
+                <div className="form-group">
+                  <label className="form-label">Your shop / business name *</label>
+                  <input className="form-input" placeholder="e.g. Raju Electricals" value={qShopName} onChange={e => setQShopName(e.target.value)} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Category</label>
+                    <select className="form-select" value={qShopCat} onChange={e => setQShopCat(e.target.value)}>
+                      <option value="">Select…</option>
+                      {SHOP_CATEGORIES.map(s => <option key={s.id} value={s.id}>{s.icon} {s.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Price (₹) *</label>
+                    <input className="form-input" type="number" placeholder="180" value={qPrice} onChange={e => setQPrice(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Delivery in (mins)</label>
+                    <input className="form-input" type="number" placeholder="30" value={qDeliveryTime} onChange={e => setQDeliveryTime(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Delivery charge (₹)</label>
+                    <input className="form-input" type="number" placeholder="0 = free" value={qDeliveryCharge} onChange={e => setQDeliveryCharge(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13, color: 'var(--text-primary)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={qDelivery} onChange={e => setQDelivery(e.target.checked)} /> Delivery available
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={qPickup} onChange={e => setQPickup(e.target.checked)} /> Pickup available
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Payment accepted</label>
+                  <select className="form-select" value={qPayment} onChange={e => setQPayment(e.target.value)}>
+                    <option value="both">UPI & Cash</option>
+                    <option value="upi">UPI only</option>
+                    <option value="cash">Cash only</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Message (optional)</label>
+                  <input className="form-input" placeholder="Any note for the buyer?" value={qMessage} onChange={e => setQMessage(e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={submitQuote} disabled={!qShopName.trim() || !qPrice}>
+                    Submit Quote
+                  </button>
+                  <button className="btn btn-secondary" style={{ flex: 0 }} onClick={() => setShowQuoteForm(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Quote cards */}
+            {quotes.length === 0 && !showQuoteForm && (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 14 }}>
+                {isLoggedIn ? 'No quotes yet. Know a shop nearby? Submit one!' : 'No quotes yet.'}
+              </div>
+            )}
+            {quotes.map(q => {
+              const isSelected = post.selectedQuoteId === q.id
+              const shopCatMeta = SHOP_CATEGORIES.find(s => s.id === q.shopCategory)
+              return (
+                <div key={q.id} style={{
+                  background: isSelected ? '#fefce8' : 'var(--card)',
+                  border: isSelected ? '2px solid #f59e0b' : '1px solid var(--border-light)',
+                  borderRadius: 'var(--radius)',
+                  padding: '12px 14px',
+                  marginBottom: 10,
+                  boxShadow: 'var(--shadow)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 15 }}>{q.shopName}</div>
+                      {shopCatMeta && <span style={{ fontSize: 11, color: '#0369a1', background: '#f0f9ff', borderRadius: 4, padding: '1px 6px' }}>{shopCatMeta.icon} {shopCatMeta.label}</span>}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--primary)' }}>₹{q.price}</div>
+                      {isSelected && <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: 4, padding: '1px 6px' }}>Selected</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, flexWrap: 'wrap' }}>
+                    {q.deliveryAvailable && q.deliveryTime && (
+                      <span>🚚 Delivery in {q.deliveryTime} min{q.deliveryCharge > 0 ? ` (₹${q.deliveryCharge})` : ' (free)'}</span>
+                    )}
+                    {q.pickupAvailable && <span>🏪 Pickup available</span>}
+                    <span>{q.paymentMode === 'upi' ? '📱 UPI' : q.paymentMode === 'cash' ? '💵 Cash' : '📱💵 UPI & Cash'}</span>
+                  </div>
+                  {q.message && <div style={{ fontSize: 13, color: 'var(--text-primary)', background: 'var(--bg)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>"{q.message}"</div>}
+
+                  {/* Actions */}
+                  {isLoggedIn && isMyPost && !post.isBought && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      {!isSelected && (
+                        <button
+                          onClick={() => actions.selectQuote(post.id, q.id)}
+                          style={{ flex: 1, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          ✅ Select this Quote
+                        </button>
+                      )}
+                      {isSelected && !post.isBought && (
+                        <>
+                          <a href={"tel:" + (q.phone || '')} style={{ flex: 1, textAlign: 'center', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                            📞 Call Shop
+                          </a>
+                          <a href={"https://wa.me/91" + (q.phone || '')} target="_blank" rel="noreferrer" style={{ flex: 1, textAlign: 'center', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                            💬 WhatsApp
+                          </a>
+                          <button
+                            onClick={() => actions.markAsBought(post.id)}
+                            style={{ flex: 0, background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            ✓ Bought
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {(isAdmin) && (
+                    <button
+                      onClick={() => actions.adminRemoveQuote(q.id)}
+                      style={{ fontSize: 11, color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', marginTop: 4 }}
+                    >
+                      🗑️ Remove quote (admin)
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

@@ -19,6 +19,48 @@ import BusinessDetailScreen    from './screens/BusinessDetailScreen'
 import MaintenanceScreen       from './screens/MaintenanceScreen'
 import InstallPrompt           from './components/InstallPrompt'
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('LocalSetu render error:', error, info)
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: 24 }}>
+          <div style={{ textAlign: 'center', maxWidth: 360 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+            <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Something went wrong</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              {this.state.error.message || 'The app hit an unexpected error.'}
+            </p>
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 16, width: 'auto' }}
+              onClick={() => {
+                try { localStorage.removeItem('localsetu_state') } catch {}
+                window.location.href = '/login'
+              }}
+            >
+              Reset app data & reload
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 // Loading splash while Supabase session is being restored
 function LoadingScreen() {
   return (
@@ -85,8 +127,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppRoutes />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppRoutes />
+      </AppProvider>
+    </ErrorBoundary>
   )
 }

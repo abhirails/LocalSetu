@@ -46,12 +46,12 @@ export default function ProfileScreen() {
           <div style={{ fontWeight: 800, fontSize: 16 }}>My Profile</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {cu.role === 'admin' && (
-              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin Dashboard">Admin</button>
+              <button className="icon-btn" onClick={() => navigate('/admin')} title="Admin Dashboard" style={{ fontSize: 20 }}>🛡️</button>
             )}
             {cu.role === 'society_admin' && (
-              <button className="icon-btn" onClick={() => navigate('/society-admin')} title="Society Admin Panel">Society</button>
+              <button className="icon-btn" onClick={() => navigate('/society-admin')} title="Society Admin" style={{ fontSize: 20 }}>🏘️</button>
             )}
-            <button className="icon-btn" onClick={() => setShowSettings(true)} title="Settings">Settings</button>
+            <button className="icon-btn" onClick={() => setShowSettings(true)} title="Settings" style={{ fontSize: 20 }}>⚙️</button>
           </div>
         </div>
 
@@ -95,7 +95,7 @@ export default function ProfileScreen() {
         {activeTab === 'posts' && (
           myPosts.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">Post</div>
+              <div className="empty-icon">📝</div>
               <div className="empty-title">No posts yet</div>
               <div className="empty-sub">Share a local update or need with your neighbors.</div>
               <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>
@@ -110,7 +110,7 @@ export default function ProfileScreen() {
         {activeTab === 'saved' && (
           savedPosts.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">Bookmark</div>
+              <div className="empty-icon">🔖</div>
               <div className="empty-title">No saved posts</div>
               <div className="empty-sub">Tap save on any post to save it for later.</div>
             </div>
@@ -123,7 +123,7 @@ export default function ProfileScreen() {
           <div>
             <div className="menu-list">
               <div className="menu-item">
-                <div className="menu-item-icon">User</div>
+                <div className="menu-item-icon">👤</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Name</div>
                   <div className="menu-item-sub">{cu.name}</div>
@@ -132,12 +132,12 @@ export default function ProfileScreen() {
 
               {/* Home locality — tappable to open switcher */}
               <button className="menu-item" onClick={() => setShowLocalitySwitcher(true)}>
-                <div className="menu-item-icon">Pin</div>
+                <div className="menu-item-icon">📍</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Home Locality</div>
                   <div className="menu-item-sub">{cu.locality}</div>
                 </div>
-                <div className="menu-item-arrow">+</div>
+                <div className="menu-item-arrow">›</div>
               </button>
 
               {/* Saved localities */}
@@ -150,7 +150,7 @@ export default function ProfileScreen() {
                     {savedLocalities.map(loc => (
                       <div key={loc} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--primary-light)', borderRadius: 20, padding: '3px 10px', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
                         <span>{loc}</span>
-                        <button onClick={() => actions.removeSavedLocality(loc)} style={{ fontSize: 14, color: 'var(--primary)', marginLeft: 2, lineHeight: 1 }}>x</button>
+                        <button onClick={() => actions.removeSavedLocality(loc)} style={{ fontSize: 14, color: 'var(--primary)', marginLeft: 2, lineHeight: 1 }}>×</button>
                       </div>
                     ))}
                     {savedLocalities.length < 2 && (
@@ -164,24 +164,24 @@ export default function ProfileScreen() {
 
               {savedLocalities.length === 0 && (
                 <button className="menu-item" onClick={() => setShowLocalitySwitcher(true)}>
-                  <div className="menu-item-icon">+</div>
+                  <div className="menu-item-icon">➕</div>
                   <div className="menu-item-text">
                     <div className="menu-item-label">Add saved locality</div>
                     <div className="menu-item-sub">Pin your office, parents area, etc. (max 2)</div>
                   </div>
-                  <div className="menu-item-arrow">+</div>
+                  <div className="menu-item-arrow">›</div>
                 </button>
               )}
 
               <div className="menu-item">
-                <div className="menu-item-icon">Phone</div>
+                <div className="menu-item-icon">📞</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Phone</div>
                   <div className="menu-item-sub">+91 {cu.phone} (verified)</div>
                 </div>
               </div>
               <div className="menu-item">
-                <div className="menu-item-icon">Calendar</div>
+                <div className="menu-item-icon">📅</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Member since</div>
                   <div className="menu-item-sub">{new Date(cu.joinedAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
@@ -213,24 +213,24 @@ export default function ProfileScreen() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title">Settings</div>
-            <div className="menu-list" style={{ margin: 0 }}>
+              <div className="menu-list" style={{ margin: 0 }}>
               <button className="menu-item" onClick={() => { setShowSettings(false); setActiveTab('about') }}>
-                <div className="menu-item-icon">Lock</div>
+                <div className="menu-item-icon">🔒</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Privacy Settings</div>
                   <div className="menu-item-sub">Control what others see</div>
                 </div>
-                <div className="menu-item-arrow">+</div>
+                <div className="menu-item-arrow">›</div>
               </button>
               <button className="menu-item" onClick={() => { setShowSettings(false); setShowLocalitySwitcher(true) }}>
-                <div className="menu-item-icon">Pin</div>
+                <div className="menu-item-icon">📍</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">My Localities</div>
                   <div className="menu-item-sub">
                     {savedLocalities.length > 0 ? `${cu.locality} + ${savedLocalities.length} saved` : cu.locality}
                   </div>
                 </div>
-                <div className="menu-item-arrow">+</div>
+                <div className="menu-item-arrow">›</div>
               </button>
               <button className="menu-item"
                 onClick={async () => {
@@ -238,11 +238,11 @@ export default function ProfileScreen() {
                   else if (notifStatus !== 'unsupported') { await requestPermission() }
                 }}
                 disabled={notifStatus === 'unsupported' || notifStatus === 'subscribing'}>
-                <div className="menu-item-icon">Bell</div>
+                <div className="menu-item-icon">🔔</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Push Notifications</div>
                   <div className="menu-item-sub">
-                    {notifStatus === 'granted' && 'On - tap to turn off'}
+                    {notifStatus === 'granted' && 'On — tap to turn off'}
                     {notifStatus === 'denied' && 'Blocked in browser settings'}
                     {notifStatus === 'unsupported' && 'Not supported in this browser'}
                     {notifStatus === 'subscribing' && 'Enabling...'}
@@ -254,15 +254,15 @@ export default function ProfileScreen() {
                 </div>
               </button>
               <button className="menu-item" onClick={() => { setShowSettings(false); window.open('mailto:support@localsetu.in', '_blank') }}>
-                <div className="menu-item-icon">Help</div>
+                <div className="menu-item-icon">📧</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label">Report an Issue</div>
                   <div className="menu-item-sub">Contact support</div>
                 </div>
-                <div className="menu-item-arrow">+</div>
+                <div className="menu-item-arrow">›</div>
               </button>
               <button className="menu-item" onClick={() => { setShowSettings(false); handleLogout() }}>
-                <div className="menu-item-icon">Exit</div>
+                <div className="menu-item-icon">🚪</div>
                 <div className="menu-item-text">
                   <div className="menu-item-label" style={{ color: 'var(--error)' }}>Log Out</div>
                 </div>

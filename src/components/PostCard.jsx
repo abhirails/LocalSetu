@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { matchesLiveLocality } from '../lib/geocode'
 import CategoryBadge from './CategoryBadge'
-import { BOOST_OPTIONS } from '../data/demoData'
+import { BOOST_OPTIONS, CIVIC_SUBCATEGORIES, MEDICAL_SUBCATEGORIES } from '../data/demoData'
 import PaymentModal from './PaymentModal'
 
 function timeAgo(dateStr) {
@@ -45,9 +45,12 @@ export default function PostCard({ post, compact = false }) {
   const [showBoost, setShowBoost] = useState(false)
 
   const author = helpers.getUser(post.userId)
+  const quoteCount = post.category === 'need_to_buy' ? helpers.getQuotes(post.id).length : 0
+  const selectedQuote = post.category === 'need_to_buy' ? helpers.getSelectedQuote(post.id) : null
   const isSaved = helpers.isPostSaved(post.id)
   const replyCount = helpers.getReplies(post.id).length
   const isMyPost = state.currentUser?.id === post.userId
+  const isAdmin = state.currentUser?.role === 'admin'
   const alreadyConfirmed = post.confirmedBy?.includes(state.currentUser?.id)
   const isNearby = matchesLiveLocality(post.locality, state.liveLocality)
   const canBoost = isMyPost && (post.type === 'right_now' || post.type === 'need_it_now') && !post.isBoosted
@@ -133,43 +136,167 @@ export default function PostCard({ post, compact = false }) {
           )}
         </div>
 
+        {/* Medical metadata */}
+        {post.category === 'medical' && post.medicalSubcategory && (() => {
+          const sub = MEDICAL_SUBCATEGORIES.find(s => s.id === post.medicalSubcategory)
+          if (!sub) return null
+          const isUrgent = sub.urgent
+          return (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '2px 8px',
+                background: isUrgent ? '#fee2e2' : '#f0f9ff',
+                color: isUrgent ? '#b91c1c' : '#0369a1',
+              }}>
+                {sub.icon} {sub.label}
+              </span>
+              {isUrgent && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c', background: '#fee2e2', borderRadius: 6, padding: '2px 8px' }}>
+                  🚨 Urgent
+                </span>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* Need to Buy metadata */}
+        {post.category === 'need_to_buy' && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, background: '#fff8f0', color: '#c2410c', borderRadius: 6, padding: '2px 8px' }}>
+              🛒 Need to Buy
+            </span>
+            {post.needToBuyItem && (
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg)', borderRadius: 6, padding: '2px 8px', border: '1px solid var(--border-light)' }}>
+                {post.needToBuyItem}{post.needToBuyQty ? ` · ${post.needToBuyQty}` : ''}
+              </span>
+            )}
+            {post.budget && (
+              <span style={{ fontSize: 11, color: '#0369a1', fontWeight: 600 }}>Budget ≤ ₹{post.budget}</span>
+            )}
+            {quoteCount > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 8px' }}>
+                💬 {quoteCount} quote{quoteCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            {selectedQuote && !post.isBought && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: 6, padding: '2px 8px' }}>
+                ✅ Quote selected
+              </span>
+            )}
+            {post.isBought && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 8px' }}>
+                ✓ Bought
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Civic issue metadata */}
+        {post.category === 'civic' && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            {post.civicSubcategory && (() => {
+              const sub = CIVIC_SUBCATEGORIES.find(s => s.id === post.civicSubcategory)
+              return sub ? (
+                <span style={{ fontSize: 11, fontWeight: 600, background: '#f0f9ff', color: '#0369a1', borderRadius: 6, padding: '2px 8px' }}>
+                  {sub.icon} {sub.label}
+                </span>
+              ) : null
+            })()}
+            {post.civicStatus === 'reported' && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#fef9c3', color: '#854d0e', borderRadius: 6, padding: '2px 8px' }}>
+                📋 Reported
+              </span>
+            )}
+            {post.civicStatus === 'confirmed_by_locals' && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: 6, padding: '2px 8px' }}>
+                👥 Confirmed by locals
+              </span>
+            )}
+            {post.civicStatus === 'resolved' && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#15803d', borderRadius: 6, padding: '2px 8px' }}>
+                ✅ Resolved
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="post-actions" onClick={e => e.stopPropagation()}>
-          {post.type === 'right_now' && (
-            <button className={`action-btn ${alreadyConfirmed ? 'active' : ''}`} onClick={handleStillHappening}>
-              Still happening
-              {post.stillHappeningCount > 0 && <span className="action-btn-count">{post.stillHappeningCount}</span>}
+          {/* Primary actions row */}
+          <div className="post-actions-primary">
+            {post.type === 'right_now' && post.category !== 'civic' && (
+              <button className={`action-btn ${alreadyConfirmed ? 'active' : ''}`} onClick={handleStillHappening}>
+                Still happening
+                {post.stillHappeningCount > 0 && <span className="action-btn-count">{post.stillHappeningCount}</span>}
+              </button>
+            )}
+            {post.type === 'right_now' && post.category === 'civic' && post.civicStatus !== 'resolved' && (
+              <button
+                className={`action-btn ${alreadyConfirmed ? 'active' : ''}`}
+                onClick={e => { e.stopPropagation(); actions.confirmCivicIssue(post.id) }}
+                disabled={alreadyConfirmed}
+              >
+                {alreadyConfirmed ? '✅ Confirmed' : "⚠️ I'm facing this too"}
+                {post.stillHappeningCount > 0 && <span className="action-btn-count">{post.stillHappeningCount}</span>}
+              </button>
+            )}
+            {post.type === 'right_now' && post.category === 'civic' && post.civicStatus !== 'resolved' && (isMyPost || isAdmin) && (
+              <button
+                className="action-btn"
+                style={{ color: '#15803d', fontWeight: 700 }}
+                onClick={e => { e.stopPropagation(); actions.resolveCivicIssue(post.id) }}
+              >
+                ✅ Mark resolved
+              </button>
+            )}
+            {post.type === 'need_it_now' && post.category !== 'need_to_buy' && !post.isFulfilled && (
+              <button className="action-btn help-btn" onClick={handleICanHelp}>
+                I can help
+                {post.helperCount > 0 && <span className="action-btn-count">{post.helperCount}</span>}
+              </button>
+            )}
+            {post.type === 'need_it_now' && post.category === 'need_to_buy' && !post.isBought && (
+              <button
+                className="action-btn help-btn"
+                onClick={e => { e.stopPropagation(); navigate(`/post/${post.id}`) }}
+              >
+                {quoteCount > 0 ? `💬 ${quoteCount} Quote${quoteCount !== 1 ? 's' : ''}` : '🛒 View / Quote'}
+              </button>
+            )}
+            <button className="action-btn" onClick={goToDetail}>
+              {replyCount > 0 ? `💬 ${replyCount}` : '💬 Reply'}
             </button>
-          )}
-          {post.type === 'need_it_now' && !post.isFulfilled && (
-            <button className="action-btn help-btn" onClick={handleICanHelp}>
-              I can help
-              {post.helperCount > 0 && <span className="action-btn-count">{post.helperCount}</span>}
+          </div>
+
+          {/* Secondary actions row — right aligned */}
+          <div className="post-actions-secondary">
+            {canBoost && (
+              <button
+                className="action-icon-btn"
+                onClick={handleBoostClick}
+                title="Boost post"
+                style={{ color: '#d97706', borderColor: '#fbbf24', background: '#fffbeb', fontWeight: 700 }}
+              >
+                ⚡ Boost
+              </button>
+            )}
+            <button className="action-icon-btn" onClick={handleShare} title="Share">
+              🔗 Share
             </button>
-          )}
-          <button className="action-btn" onClick={goToDetail}>
-            {replyCount > 0 ? replyCount : 'Reply'}
-          </button>
-          <div className="action-spacer" />
-          {canBoost && (
-            <button
-              className="action-icon-btn"
-              onClick={handleBoostClick}
-              title="Boost post"
-              style={{ color: '#d97706', fontWeight: 700 }}
-            >
-              ⚡ Boost
+            <button className={`action-icon-btn ${isSaved ? 'saved' : ''}`} onClick={handleSave} title={isSaved ? 'Unsave' : 'Save'}>
+              {isSaved ? '🔖 Saved' : '🔖 Save'}
             </button>
-          )}
-          <button className="action-icon-btn" onClick={handleShare} title="Share">Share</button>
-          <button className={`action-icon-btn ${isSaved ? 'saved' : ''}`} onClick={handleSave} title={isSaved ? 'Unsave' : 'Save'}>
-            {isSaved ? 'Saved' : 'Save'}
-          </button>
-          {!isMyPost && (
-            <button className="action-icon-btn" onClick={handleReport} title="Report">Report</button>
-          )}
-          {isMyPost && post.type === 'need_it_now' && !post.isFulfilled && (
-            <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }}>Done</button>
-          )}
+            {!isMyPost && (
+              <button className="action-icon-btn report-btn" onClick={handleReport} title="Report">
+                🚩 Report
+              </button>
+            )}
+            {isMyPost && post.type === 'need_it_now' && !post.isFulfilled && (
+              <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }}
+                style={{ color: 'var(--success)', borderColor: 'var(--success)', background: 'var(--success-light)', fontWeight: 700 }}>
+                ✓ Done
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

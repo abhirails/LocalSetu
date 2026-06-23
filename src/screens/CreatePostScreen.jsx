@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
-import { CATEGORY_META, SERVICE_TYPES, LOCALITIES } from '../data/demoData'
+import { CATEGORY_META, SERVICE_TYPES, LOCALITIES, CIVIC_SUBCATEGORIES, MEDICAL_SUBCATEGORIES } from '../data/demoData'
 
 const RIGHT_NOW_CATEGORIES = [
   { id: 'traffic', label: 'Traffic', icon: '🚗' },
@@ -11,15 +11,17 @@ const RIGHT_NOW_CATEGORIES = [
   { id: 'power', label: 'Power Cut', icon: '⚡' },
   { id: 'weather', label: 'Weather', icon: '🌧️' },
   { id: 'safety', label: 'Safety Alert', icon: '🚨' },
-  { id: 'civic', label: 'Civic Issue', icon: '🏗️' }
+  { id: 'civic',   label: 'Civic Issue', icon: '🏗️' },
+  { id: 'medical', label: 'Medical',     icon: '🏥' }
 ]
 
 const NEED_CATEGORIES = [
-  { id: 'borrow', label: 'Borrow / Lend Item', icon: '🤝' },
-  { id: 'rideshare', label: 'Ride Share', icon: '🚕' },
-  { id: 'urgent', label: 'Urgent Help', icon: '🆘' },
-  { id: 'ticket', label: 'Spare Ticket', icon: '🎟️' },
-  { id: 'errand', label: 'Local Errand', icon: '📦' }
+  { id: 'borrow',       label: 'Borrow / Lend Item', icon: '🤝' },
+  { id: 'rideshare',    label: 'Ride Share',          icon: '🚕' },
+  { id: 'urgent',       label: 'Urgent Help',         icon: '🆘' },
+  { id: 'ticket',       label: 'Spare Ticket',        icon: '🎟️' },
+  { id: 'errand',       label: 'Local Errand',        icon: '📦' },
+  { id: 'need_to_buy',  label: 'Need to Buy',         icon: '🛒' },
 ]
 
 const DISTANCE_OPTIONS = [
@@ -43,12 +45,22 @@ export default function CreatePostScreen() {
   const [rnContent, setRnContent] = useState('')
   const [rnLocality, setRnLocality] = useState(state.currentUser?.locality || '')
 
+  // Civic subcategory (only when rnCategory === 'civic')
+  const [civicSubcategory, setCivicSubcategory] = useState('')
+  const [medicalSubcategory, setMedicalSubcategory] = useState('')
+
   // Need It Now fields
   const [ninCategory, setNinCategory] = useState('')
   const [ninContent, setNinContent] = useState('')
   const [ninLocality, setNinLocality] = useState(state.currentUser?.locality || '')
   const [ninNeededBy, setNinNeededBy] = useState('')
   const [ninDistance, setNinDistance] = useState('2km')
+
+  // Need to Buy extra fields
+  const [buyItem, setBuyItem] = useState('')
+  const [buyQty, setBuyQty] = useState('')
+  const [buyDeliveryPref, setBuyDeliveryPref] = useState('either')
+  const [buyBudget, setBuyBudget] = useState('')
 
   // Verified Help fields
   const [vhName, setVhName] = useState('')
@@ -77,7 +89,14 @@ export default function CreatePostScreen() {
       expiresAt,
       stillHappeningCount: 0,
       confirmedBy: [],
-      isPinned: false
+      isPinned: false,
+      ...(rnCategory === 'civic' && {
+        civicSubcategory: civicSubcategory || null,
+        civicStatus: 'reported',
+      }),
+      ...(rnCategory === 'medical' && {
+        medicalSubcategory: medicalSubcategory || null,
+      })
     })
     navigate('/right-now')
   }
@@ -96,7 +115,15 @@ export default function CreatePostScreen() {
       neededBy: ninNeededBy ? new Date(ninNeededBy).toISOString() : new Date(Date.now() + 12 * 3600000).toISOString(),
       distanceRange: ninDistance,
       helperCount: 0,
-      isFulfilled: false
+      isFulfilled: false,
+      selectedQuoteId: null,
+      isBought: false,
+      ...(ninCategory === 'need_to_buy' && {
+        needToBuyItem:  buyItem.trim() || null,
+        needToBuyQty:   buyQty.trim() || null,
+        deliveryPref:   buyDeliveryPref,
+        budget:         buyBudget ? parseInt(buyBudget) : null,
+      })
     })
     navigate('/help')
   }
@@ -176,7 +203,7 @@ export default function CreatePostScreen() {
                   <button
                     key={cat.id}
                     className={`category-item ${rnCategory === cat.id ? 'selected' : ''}`}
-                    onClick={() => setRnCategory(cat.id)}
+                    onClick={() => { setRnCategory(cat.id); if (cat.id !== 'civic') setCivicSubcategory(''); if (cat.id !== 'medical') setMedicalSubcategory('') }}
                   >
                     <span className="category-icon">{cat.icon}</span>
                     <span className="category-label">{cat.label}</span>
@@ -184,6 +211,50 @@ export default function CreatePostScreen() {
                 ))}
               </div>
             </div>
+
+            {/* Medical subcategory picker */}
+            {rnCategory === 'medical' && (
+              <div className="form-group">
+                <label className="form-label">What type of medical situation?</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  {MEDICAL_SUBCATEGORIES.map(sub => (
+                    <button
+                      key={sub.id}
+                      className={`category-item ${medicalSubcategory === sub.id ? 'selected' : ''}`}
+                      onClick={() => setMedicalSubcategory(sub.id)}
+                      style={sub.urgent ? { borderColor: '#ef4444', background: medicalSubcategory === sub.id ? '#fee2e2' : undefined } : {}}
+                    >
+                      <span className="category-icon">{sub.icon}</span>
+                      <span className="category-label">{sub.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {(medicalSubcategory === 'ambulance' || medicalSubcategory === 'blood') && (
+                  <div style={{ marginTop: 8, padding: '8px 12px', background: '#fee2e2', borderRadius: 8, fontSize: 12, color: '#b91c1c', fontWeight: 600 }}>
+                    🚨 For life-threatening emergencies, call 108 (ambulance) or 102 (blood bank) immediately. LocalSetu is a community network, not a substitute for emergency services.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Civic subcategory picker — only shown when civic is selected */}
+            {rnCategory === 'civic' && (
+              <div className="form-group">
+                <label className="form-label">What type of civic issue?</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  {CIVIC_SUBCATEGORIES.map(sub => (
+                    <button
+                      key={sub.id}
+                      className={`category-item ${civicSubcategory === sub.id ? 'selected' : ''}`}
+                      onClick={() => setCivicSubcategory(sub.id)}
+                    >
+                      <span className="category-icon">{sub.icon}</span>
+                      <span className="category-label">{sub.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label">Locality / Area</label>
@@ -225,8 +296,8 @@ export default function CreatePostScreen() {
             <button
               className="btn btn-primary"
               onClick={submitRightNow}
-              disabled={!rnCategory || !rnContent.trim()}
-              style={{ opacity: !rnCategory || !rnContent.trim() ? 0.5 : 1, marginTop: 8 }}
+              disabled={!rnCategory || !rnContent.trim() || (rnCategory === 'civic' && !civicSubcategory) || (rnCategory === 'medical' && !medicalSubcategory)}
+              style={{ opacity: (!rnCategory || !rnContent.trim() || (rnCategory === 'civic' && !civicSubcategory) || (rnCategory === 'medical' && !medicalSubcategory)) ? 0.5 : 1, marginTop: 8 }}
             >
               ⚡ Post Right Now Update
             </button>
@@ -266,6 +337,42 @@ export default function CreatePostScreen() {
                 onChange={e => setNinLocality(e.target.value)}
               />
             </div>
+
+            {/* Need to Buy extra fields */}
+            {ninCategory === 'need_to_buy' && (
+              <>
+                <div style={{ background: '#fff8f0', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#78350F', marginBottom: 4, lineHeight: 1.5 }}>
+                  🛒 <strong>Need to Buy</strong> — post your requirement. Nearby shops will send you quotes with price and delivery time. No payment inside the app — contact shop directly.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Item name</label>
+                    <input className="form-input" type="text" placeholder="e.g. 16A socket"
+                      value={buyItem} onChange={e => setBuyItem(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Quantity</label>
+                    <input className="form-input" type="text" placeholder="e.g. 2 pieces"
+                      value={buyQty} onChange={e => setBuyQty(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Delivery preference</label>
+                    <select className="form-select" value={buyDeliveryPref} onChange={e => setBuyDeliveryPref(e.target.value)}>
+                      <option value="either">Delivery or pickup</option>
+                      <option value="delivery">Delivery preferred</option>
+                      <option value="pickup">Pickup only</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Budget (optional)</label>
+                    <input className="form-input" type="number" placeholder="₹ max budget"
+                      value={buyBudget} onChange={e => setBuyBudget(e.target.value)} />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="form-group">
               <label className="form-label">Describe your need (max 280 chars)</label>
