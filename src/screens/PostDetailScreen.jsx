@@ -48,6 +48,7 @@ export default function PostDetailScreen() {
   const navigate = useNavigate()
   const [replyText, setReplyText] = useState('')
   const [showSafety, setShowSafety] = useState(false)
+  const [safetyAcknowledged, setSafetyAcknowledged] = useState(false)
   const [shareFeedback, setShareFeedback] = useState('')
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [qShopName, setQShopName] = useState('')
@@ -134,7 +135,7 @@ export default function PostDetailScreen() {
       actions.confirmStillHappening(post.id)
     } else if (quickType === 'i_can_help') {
       content = 'I can help!'; replyType = 'i_can_help'
-      actions.markICanHelp(post.id)
+      !safetyAcknowledged ? setShowSafety(true) : actions.markICanHelp(post.id)
       setShowSafety(true)
     } else if (quickType === 'i_know_someone') {
       content = 'I know someone who can help!'; replyType = 'i_know_someone'
@@ -171,7 +172,7 @@ export default function PostDetailScreen() {
         {!isLoggedIn && (
           <div style={{ background: 'linear-gradient(90deg, var(--primary-light), #FFF8F5)', borderBottom: '1px solid var(--border-light)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>LocalSetu - Kharghar</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>LocalSetu</div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Real help and updates from people near you</div>
             </div>
             <button onClick={handleLoginRedirect} style={{ background: 'var(--primary)', color: 'white', borderRadius: 16, padding: '6px 12px', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
@@ -493,6 +494,54 @@ export default function PostDetailScreen() {
           </div>
           <BottomNav />
         </>
+      )}
+      {/* ── Safety Warning Modal ──────────────────────────── */}
+      {showSafety && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+        }} onClick={() => setShowSafety(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--card-bg, #fff)', borderRadius: '20px 20px 0 0',
+            padding: '20px 20px 32px', width: '100%', maxWidth: 480
+          }}>
+            <div style={{ width: 36, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 20, marginBottom: 8, textAlign: 'center' }}>🛡️ Stay Safe</div>
+            <div style={{ fontSize: 15, fontWeight: 700, textAlign: 'center', marginBottom: 16 }}>
+              Before you respond to this request
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {[
+                ['📍', 'Meet in a public place', 'Lobby, society gate, or a common area — not inside a home'],
+                ['🚫', 'Never share OTP or bank details', 'No helper or borrower ever needs your OTP or account number'],
+                ['✅', 'Verify the person first', 'Check their LocalSetu profile and recommendations before handing anything over'],
+                ['🏠', "Don't share your flat number", "Share your building name or area only — not your flat number"],
+              ].map(([icon, title, sub]) => (
+                <div key={title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: 'var(--bg-alt, #f8f9fa)', borderRadius: 10, padding: '10px 12px' }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => { setSafetyAcknowledged(true); setShowSafety(false); actions.markICanHelp(post.id) }}
+              style={{
+                width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+                background: 'var(--primary)', color: '#fff', fontWeight: 700,
+                fontSize: 15, cursor: 'pointer'
+              }}
+            >
+              I understand — I can help ✓
+            </button>
+            <button onClick={() => setShowSafety(false)}
+              style={{ width: '100%', marginTop: 10, padding: '10px', borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 14, cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -168,7 +168,7 @@ export default function BusinessListingsScreen() {
           </button>
           <div>
             <div style={{ fontSize: 17, fontWeight: 800 }}>Local Businesses</div>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>Verified businesses near Kharghar</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>{`Verified businesses near ${state?.currentUser?.locality?.split(',')[0] || 'your area'}`}</div>
           </div>
         </div>
 
@@ -246,7 +246,7 @@ export default function BusinessListingsScreen() {
           <div style={{ fontSize: 22, marginBottom: 6 }}>🏪</div>
           <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>List Your Business</div>
           <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 12 }}>
-            Reach 1,000+ residents in Kharghar. Plans from ₹299/month.
+            Reach 1,000+ residents in your area. Plans from ₹299/month.
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
             {[

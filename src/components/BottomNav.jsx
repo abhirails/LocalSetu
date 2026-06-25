@@ -1,5 +1,6 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { cx, ui } from '../lib/ui'
 
 const NAV_ITEMS = [
   { path: '/home', icon: '🏠', label: 'Home' },
@@ -14,29 +15,29 @@ export default function BottomNav() {
   const location = useLocation()
 
   return (
-    <nav className="bottom-nav">
+    <nav className={ui.bottomNav}>
       {NAV_ITEMS.map((item) => {
         const isActive = location.pathname === item.path
         if (item.isPost) {
           return (
             <button
               key={item.path}
-              className="nav-item nav-item-post"
+              className={ui.navItemPost}
               onClick={() => navigate(item.path)}
               aria-label="Create post"
             >
-              <span className="nav-item-post-icon" aria-hidden="true">+</span>
+              <span className={ui.navItemPostIcon} aria-hidden="true">+</span>
             </button>
           )
         }
         return (
           <button
             key={item.path}
-            className={`nav-item ${isActive ? 'active' : ''}`}
+            className={cx(ui.navItem, isActive && ui.navItemActive)}
             onClick={() => navigate(item.path)}
             aria-label={item.label}
           >
-            <span className="nav-item-icon">{item.icon}</span>
+            <span className={cx(ui.navItemIcon, isActive && ui.navItemIconActive)}>{item.icon}</span>
             <span>{item.label}</span>
           </button>
         )

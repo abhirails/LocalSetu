@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* ==============================
    LocalSetu Design System
    ============================== */
@@ -104,18 +106,24 @@ html {
 
 body {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg);
+  background: var(--bg-alt);
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
   border: none;
-  background: none;
   padding: 0;
 }
 
@@ -1098,8 +1106,8 @@ img {
 }
 
 .login-hero {
-  background: linear-gradient(160deg, var(--navy) 0%, #2D3A6B 100%);
-  padding: 60px 28px 40px;
+  background: linear-gradient(160deg, var(--primary) 0%, #FF8A50 100%);
+  padding: 40px 28px 32px;
   color: white;
   flex-shrink: 0;
 }
@@ -1114,9 +1122,8 @@ img {
 }
 
 .login-logo span {
-  background: linear-gradient(135deg, var(--primary) 0%, #FF8A50 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: rgba(255,255,255,0.88);
+  -webkit-text-fill-color: rgba(255,255,255,0.88);
 }
 
 .login-tagline {

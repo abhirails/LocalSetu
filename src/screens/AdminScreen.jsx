@@ -306,7 +306,7 @@ export default function AdminScreen() {
 
           const exportDigest = () => {
             const lines = []
-            lines.push('Kharghar Civic Pulse — LocalSetu Weekly Digest')
+            lines.push('LocalSetu Civic Pulse — Weekly Digest')
             lines.push('Generated: ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
             lines.push('─────────────────────────────────────────')
             const grouped = {}

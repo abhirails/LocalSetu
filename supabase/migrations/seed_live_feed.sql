@@ -29,9 +29,11 @@ BEGIN
   u2 := COALESCE(u2, u1);
   u3 := COALESCE(u3, u1);
 
-  UPDATE public.profiles SET locality = 'Kharghar Sector 20' WHERE id = u1;
-  UPDATE public.profiles SET locality = 'Kharghar Sector 12' WHERE id = u2 AND id != u1;
-  UPDATE public.profiles SET locality = 'Kharghar Sector 7'  WHERE id = u3 AND id NOT IN (u1, u2);
+  -- Pilot demo: only real auth accounts exist — give 2nd/3rd profiles
+  -- friendly local resident names so the feed doesn't look like one person.
+  UPDATE public.profiles SET name = 'Abhay G.',      locality = 'Kharghar Sector 20' WHERE id = u1;
+  UPDATE public.profiles SET name = 'Priya Nair',    locality = 'Kharghar Sector 12' WHERE id = u2 AND id != u1;
+  UPDATE public.profiles SET name = 'Rohan Mehta',   locality = 'Kharghar Sector 35' WHERE id = u3 AND id NOT IN (u1, u2);
 
   -- ── RIGHT NOW ──
   INSERT INTO public.posts (user_id, type, locality, category, content, expires_at, still_happening_count, created_at)

@@ -58,7 +58,7 @@ export default function ProviderCard({ provider, showActions = true }) {
           <span>{provider.recommendationCount} local{provider.recommendationCount !== 1 ? 's' : ''} recommended</span>
           {!provider.isVerified && (
             <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
-              · {3 - provider.recommendationCount} more for verified badge
+              · {3 - (provider.recommendationCount || 0)} more recommendations for Verified status
             </span>
           )}
         </div>

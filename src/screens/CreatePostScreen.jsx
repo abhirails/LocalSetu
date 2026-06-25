@@ -84,6 +84,8 @@ export default function CreatePostScreen() {
       type: 'right_now',
       userId: state.currentUser.id,
       locality: rnLocality || state.currentUser?.locality,
+        city: userCity,
+        state: userState,
       category: rnCategory,
       content: rnContent.trim(),
       expiresAt,
@@ -261,7 +263,7 @@ export default function CreatePostScreen() {
               <input
                 className="form-input"
                 type="text"
-                placeholder="e.g. Kharghar Sector 20, Palm Beach Road"
+                placeholder="e.g. Bandra West, Sector 56 Gurgaon"
                 value={rnLocality}
                 onChange={e => setRnLocality(e.target.value)}
               />
@@ -293,12 +295,19 @@ export default function CreatePostScreen() {
               </ul>
             </div>
 
-            <button
-              className="btn btn-primary"
+            <button              className="btn btn-primary"
               onClick={submitRightNow}
               disabled={!rnCategory || !rnContent.trim() || (rnCategory === 'civic' && !civicSubcategory) || (rnCategory === 'medical' && !medicalSubcategory)}
               style={{ opacity: (!rnCategory || !rnContent.trim() || (rnCategory === 'civic' && !civicSubcategory) || (rnCategory === 'medical' && !medicalSubcategory)) ? 0.5 : 1, marginTop: 8 }}
             >
+              <div style={{
+                background: 'rgba(var(--primary-rgb,255,107,53),0.06)',
+                border: '1px solid rgba(var(--primary-rgb,255,107,53),0.18)',
+                borderRadius: 10, padding: '10px 14px', marginBottom: 10,
+                fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6
+              }}>
+                🔒 Only your <strong>locality name</strong> is shown — never your flat number or exact address.
+              </div>
               ⚡ Post Right Now Update
             </button>
           </div>
@@ -332,7 +341,7 @@ export default function CreatePostScreen() {
               <input
                 className="form-input"
                 type="text"
-                placeholder="e.g. Kharghar Sector 7"
+                placeholder="e.g. Koramangala, Andheri West"
                 value={ninLocality}
                 onChange={e => setNinLocality(e.target.value)}
               />
@@ -472,7 +481,7 @@ export default function CreatePostScreen() {
               <input
                 className="form-input"
                 type="text"
-                placeholder="e.g. Kharghar Sector 10"
+                placeholder="e.g. Velachery, Salt Lake Sector 5"
                 value={vhLocality}
                 onChange={e => setVhLocality(e.target.value)}
               />

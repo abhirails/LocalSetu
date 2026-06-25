@@ -5,7 +5,8 @@ import * as db from '../lib/db'
 import { updateCivicStatus as dbUpdateCivicStatus } from '../lib/db'
 import { DEMO_USERS, DEMO_POSTS, DEMO_PROVIDERS, DEMO_REPLIES, DEMO_REPORTS, DEMO_SOCIETIES, DEMO_SOCIETY_POSTS, DEMO_SOCIETY_MEMBERS, DEMO_BUSINESSES, DEMO_RSVPS, DEMO_MAINTENANCE_RECORDS, DEMO_COMPLAINTS, DEMO_CIVIC_POSTS, DEMO_BUY_POSTS, DEMO_QUOTES, DEMO_MEDICAL_POSTS, DEMO_MEDICAL_PROVIDERS, DEMO_MEDICAL_BUSINESSES,
   DEMO_EDUCATION_PROVIDERS, DEMO_EDUCATION_BUSINESSES,
-  DEMO_WELLNESS_PROVIDERS, DEMO_WELLNESS_BUSINESSES } from '../data/demoData'
+  DEMO_WELLNESS_PROVIDERS, DEMO_WELLNESS_BUSINESSES,
+  DEMO_MULTICITY_POSTS, DEMO_MULTICITY_PROVIDERS, DEMO_MULTICITY_BUSINESSES } from '../data/demoData'
 
 const AppContext = createContext(null)
 
@@ -25,15 +26,15 @@ function createDefaultState() {
   return {
     currentUser: null,
     users: DEMO_USERS,
-    posts: [...DEMO_POSTS, ...DEMO_CIVIC_POSTS, ...DEMO_BUY_POSTS, ...DEMO_MEDICAL_POSTS],
-    providers: [...DEMO_PROVIDERS, ...DEMO_MEDICAL_PROVIDERS, ...DEMO_EDUCATION_PROVIDERS, ...DEMO_WELLNESS_PROVIDERS],
+    posts: [...DEMO_POSTS, ...DEMO_CIVIC_POSTS, ...DEMO_BUY_POSTS, ...DEMO_MEDICAL_POSTS, ...DEMO_MULTICITY_POSTS],
+    providers: [...DEMO_PROVIDERS, ...DEMO_MEDICAL_PROVIDERS, ...DEMO_EDUCATION_PROVIDERS, ...DEMO_WELLNESS_PROVIDERS, ...DEMO_MULTICITY_PROVIDERS],
     replies: DEMO_REPLIES,
     reports: DEMO_REPORTS,
     savedPostIds: [],
     societies: DEMO_SOCIETIES,
     societyPosts: DEMO_SOCIETY_POSTS,
     societyMembers: DEMO_SOCIETY_MEMBERS,
-    businesses: [...DEMO_BUSINESSES, ...DEMO_MEDICAL_BUSINESSES, ...DEMO_EDUCATION_BUSINESSES, ...DEMO_WELLNESS_BUSINESSES],
+    businesses: [...DEMO_BUSINESSES, ...DEMO_MEDICAL_BUSINESSES, ...DEMO_EDUCATION_BUSINESSES, ...DEMO_WELLNESS_BUSINESSES, ...DEMO_MULTICITY_BUSINESSES],
     rsvps: DEMO_RSVPS,
     maintenanceRecords: DEMO_MAINTENANCE_RECORDS,
     complaints: DEMO_COMPLAINTS,
@@ -67,6 +68,8 @@ function reducer(state, action) {
     // ── Auth ──
     case 'SET_USER':
       return { ...state, currentUser: action.user, loading: false }
+    case 'SET_ALL_DEMO':
+      return { ...state, ...action.data, loading: false }
     case 'LOGOUT':
       return { ...state, currentUser: null, savedPostIds: [] }
     case 'SET_LOADING':
@@ -202,6 +205,16 @@ function reducer(state, action) {
     // ── Societies ──
     case 'SET_SOCIETIES':
       return { ...state, societies: action.societies }
+    case 'ADD_SOCIETY':
+      return { ...state, societies: [action.society, ...state.societies] }
+    case 'UPDATE_CURRENT_USER_ROLE': {
+      const updatedUser = { ...state.currentUser, ...action.updates }
+      return {
+        ...state,
+        currentUser: updatedUser,
+        users: (state.users || []).map(u => u.id === updatedUser.id ? updatedUser : u)
+      }
+    }
     case 'SET_SOCIETY_POSTS':
       return {
         ...state,
@@ -522,6 +535,15 @@ export function AppProvider({ children }) {
 
     login: async (user) => {
       dispatch({ type: 'SET_USER', user: { ...user, savedPosts: user.savedPosts || [] } })
+    },
+
+    previewLogin: (user) => {
+      const demoState = initDemoState()
+      dispatch({ type: 'SET_ALL_DEMO', data: {
+        ...demoState,
+        currentUser: { ...user, savedPosts: user.savedPosts || [] },
+        loading: false
+      }})
     },
 
     logout: async () => {
@@ -925,6 +947,64 @@ export function AppProvider({ children }) {
       toast('Request rejected.')
       if (isSupabaseConfigured) {
         await db.rejectSocietyMember(memberId, state.currentUser.id).catch(console.error)
+      }
+    },
+
+    // ── Society Registration ──
+    registerSociety: async (societyData) => {
+      const userId = state.currentUser?.id
+      if (!userId) return
+      const optimistic = {
+        ...societyData,
+        id: 'opt_soc_' + Date.now(),
+        adminId: userId,
+        isVerified: false,
+        isPro: false,
+        registration_status: 'pending',
+        createdAt: new Date().toISOString(),
+      }
+      dispatch({ type: 'ADD_SOCIETY', society: optimistic })
+      dispatch({
+        type: 'UPDATE_CURRENT_USER_ROLE',
+        updates: {
+          role: 'society_admin',
+          societyId: optimistic.id,
+          adminFlatNumber: societyData.adminFlatNumber,
+          adminRole: societyData.adminRole,
+        }
+      })
+      toast('Society registration submitted! Pending verification.')
+      if (canUseRemote) {
+        try {
+          const { data, error } = await supabase
+            .from('societies')
+            .insert({
+              name: societyData.name,
+              sector: societyData.sector,
+              landmark: societyData.landmark,
+              pincode: societyData.pincode,
+              wings: societyData.wings,
+              total_flats: societyData.totalFlats,
+              description: societyData.description,
+              rules: societyData.rules,
+              contact_phone: societyData.contactPhone,
+              registration_number: societyData.registrationNumber,
+              admin_id: userId,
+              admin_flat_number: societyData.adminFlatNumber,
+              admin_role: societyData.adminRole,
+              locality: societyData.locality,
+              registration_status: 'pending',
+              is_verified: false,
+            })
+            .select()
+            .single()
+          if (!error && data) {
+            dispatch({ type: 'ADD_SOCIETY', society: data })
+            dispatch({ type: 'UPDATE_CURRENT_USER_ROLE', updates: { societyId: data.id } })
+          }
+        } catch (err) {
+          console.error('LocalSetu: registerSociety failed', err)
+        }
       }
     },
 

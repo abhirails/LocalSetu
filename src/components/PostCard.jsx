@@ -6,6 +6,15 @@ import CategoryBadge from './CategoryBadge'
 import { BOOST_OPTIONS, CIVIC_SUBCATEGORIES, MEDICAL_SUBCATEGORIES } from '../data/demoData'
 import PaymentModal from './PaymentModal'
 
+function shareToWhatsApp(post) {
+  const locality = post.locality || 'your area'
+  const title = post.title || post.content?.substring(0, 60) || 'Local update'
+  const typeLabel = post.type === 'right_now' ? '🚨 Alert' : post.type === 'need_now' ? '🙋 Need' : '💬 Post'
+  const text = `${typeLabel} near ${locality}:\n"${title}"\n\nSee & respond on LocalSetu — the local utility app for your area.\nhttps://localsetu.in`
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+
+
 // ── Feature flags ──
 // Set to true in Phase 4 when payment flow is ready
 const ENABLE_BOOSTS = false
@@ -82,10 +91,15 @@ export default function PostCard({ post, compact = false }) {
   const handleShare = async (e) => {
     e.stopPropagation()
     const url = `${window.location.origin}/post/${post.id}`
+    const locality = post.locality || 'your area'
+    const title = post.title || post.content?.substring(0, 60) || 'Local update'
+    const typeLabel = post.type === 'right_now' ? '🚨 Alert' : post.type === 'need_now' ? '🙋 Need' : '💬 Post'
+    const waText = `${typeLabel} near ${locality}:\n"${title}"\n\nSee & respond on LocalSetu:\n${url}`
+    // Prefer native share on supported devices; fall back to WhatsApp
     if (navigator.share) {
-      try { await navigator.share({ title: 'LocalSetu', text: post.content.slice(0, 80), url }); return } catch {}
+      try { await navigator.share({ title: 'LocalSetu', text: waText, url }); return } catch {}
     }
-    try { await navigator.clipboard.writeText(url) } catch {}
+    window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
   }
 
   const submitReport = (reason) => { actions.reportPost(post.id, reason); setShowReport(false) }
@@ -284,8 +298,9 @@ export default function PostCard({ post, compact = false }) {
                 ⚡ Boost
               </button>
             )}
-            <button className="action-icon-btn" onClick={handleShare} title="Share">
-              🔗 Share
+            <button className="action-icon-btn" onClick={handleShare} title="Share on WhatsApp"
+              style={{ color: '#25d366', borderColor: '#25d366' }}>
+              📤 WhatsApp
             </button>
             <button className={`action-icon-btn ${isSaved ? 'saved' : ''}`} onClick={handleSave} title={isSaved ? 'Unsave' : 'Save'}>
               {isSaved ? '🔖 Saved' : '🔖 Save'}
@@ -296,9 +311,9 @@ export default function PostCard({ post, compact = false }) {
               </button>
             )}
             {isMyPost && post.type === 'need_it_now' && !post.isFulfilled && (
-              <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id) }}
+              <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); actions.markFulfilled(post.id); toast && toast('✅ Marked as fulfilled! Thanks for updating your neighbors.') }}
                 style={{ color: 'var(--success)', borderColor: 'var(--success)', background: 'var(--success-light)', fontWeight: 700 }}>
-                ✓ Mark as fulfilled
+                ✓ Need fulfilled
               </button>
             )}
           </div>

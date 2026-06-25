@@ -55,14 +55,24 @@ export default function SocietyListScreen() {
           >
             ←
           </button>
-          <div>
+          <div style={{ flex: 1 }}>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
               Societies
             </h2>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-light)' }}>
-              Kharghar • {societies.length} registered
+              {state?.currentUser?.locality?.split(',')[0] || 'Your area'} • {societies.length} registered
             </p>
           </div>
+          <button
+            onClick={() => navigate('/register-society')}
+            style={{
+              background: 'var(--primary)', color: '#fff', border: 'none',
+              borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0
+            }}
+          >
+            + Register
+          </button>
         </div>
 
         {/* Search */}

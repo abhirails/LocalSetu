@@ -177,7 +177,15 @@ export default function HelpScreen() {
             <div style={{ background: 'var(--success-light)', padding: '8px 16px', fontSize: 12, color: 'var(--success)', fontWeight: 600, display: 'flex', gap: 6, borderBottom: '1px solid var(--border-light)' }}>
               ✅ "Verified by Locals" badge = 3+ residents recommended this helper
             </div>
-            {providers.length === 0 ? (
+            <div style={{
+            margin: '8px 0 4px', padding: '10px 14px',
+            background: 'rgba(234,179,8,0.07)', border: '1px solid rgba(234,179,8,0.2)',
+            borderRadius: 10, fontSize: 12, color: '#92400e', lineHeight: 1.55
+          }}>
+            ⚠️ <strong>Verify before hiring:</strong> Meet providers in a common area first.
+            Don't pay cash in advance without checking references. LocalSetu verifies locality, not professional credentials.
+          </div>
+          {providers.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">🔍</div>
                 <div className="empty-title">No helpers found</div>

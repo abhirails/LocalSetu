@@ -9,32 +9,32 @@ const daysAhead = (n) => new Date(now + n * 24 * 60 * 60 * 1000).toISOString()
 export const DEMO_USERS = [
   {
     id: 'user_1', name: 'Rahul Sharma', phone: '9876543210', email: 'rahul@example.com',
-    locality: 'Kharghar Sector 20', role: 'resident', isVerified: true, trustScore: 82,
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai', state: 'Maharashtra', role: 'resident', isVerified: true, trustScore: 82,
     joinedAt: '2024-01-15T10:00:00Z', savedPosts: [], blockedUsers: [], postsCount: 7, helpCount: 3
   },
   {
     id: 'user_2', name: 'Priya Menon', phone: '9876543211', email: 'priya@example.com',
-    locality: 'Kharghar Sector 12', role: 'resident', isVerified: false, trustScore: 65,
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai', state: 'Maharashtra', role: 'resident', isVerified: false, trustScore: 65,
     joinedAt: '2024-02-10T10:00:00Z', savedPosts: [], blockedUsers: [], postsCount: 4, helpCount: 2
   },
   {
     id: 'user_3', name: 'Ajay Patil', phone: '9876543212', email: 'ajay@example.com',
-    locality: 'Kharghar Sector 7', role: 'resident', isVerified: true, trustScore: 90,
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai', state: 'Maharashtra', role: 'resident', isVerified: true, trustScore: 90,
     joinedAt: '2024-01-05T10:00:00Z', savedPosts: [], blockedUsers: [], postsCount: 14, helpCount: 9
   },
   {
     id: 'user_4', name: 'Sneha Iyer', phone: '9876543213', email: 'sneha@example.com',
-    locality: 'Nerul Sector 25', role: 'resident', isVerified: false, trustScore: 60,
+    locality: 'Nerul, Navi Mumbai', city: 'Navi Mumbai', state: 'Maharashtra', role: 'resident', isVerified: false, trustScore: 60,
     joinedAt: '2024-03-01T10:00:00Z', savedPosts: [], blockedUsers: [], postsCount: 3, helpCount: 1
   },
   {
     id: 'user_5', name: 'Vikram Nair', phone: '9876543214', email: 'vikram@example.com',
-    locality: 'Kamothe Sector 4', role: 'resident', isVerified: true, trustScore: 75,
+    locality: 'Kamothe, Navi Mumbai', city: 'Navi Mumbai', state: 'Maharashtra', role: 'resident', isVerified: true, trustScore: 75,
     joinedAt: '2024-01-20T10:00:00Z', savedPosts: [], blockedUsers: [], postsCount: 8, helpCount: 5
   },
   {
     id: 'admin_1', name: 'Meera Joshi', phone: '9876540000', email: 'admin@localsetu.com',
-    locality: 'Kharghar Sector 1', role: 'admin', isVerified: true, trustScore: 100,
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai', state: 'Maharashtra', role: 'admin', isVerified: true, trustScore: 100,
     joinedAt: '2024-01-01T10:00:00Z', savedPosts: [], blockedUsers: [], postsCount: 2, helpCount: 1
   }
 ]
@@ -104,7 +104,7 @@ export const DEMO_POSTS = [
     neededBy: hoursAhead(6), distanceRange: '1km', helperCount: 0, isFulfilled: false
   },
   {
-    id: 'post_10', type: 'need_it_now', userId: 'user_3', locality: 'Kharghar Sector 20',
+    id: 'post_10', type: 'need_it_now', userId: 'user_3', locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     category: 'borrow',
     content: 'Need cricket bat for evening match today. Willow bat preferred. 3-4 ghante ke liye. Sector 20 ground, 5 PM.',
     createdAt: mins(60), expiresAt: hoursAhead(12), status: 'active', reportCount: 0,
@@ -121,21 +121,21 @@ export const DEMO_POSTS = [
 
 export const DEMO_PROVIDERS = [
   {
-    id: 'prov_1', name: 'Ramesh Bhai', serviceType: 'plumber', locality: 'Kharghar Sector 10',
+    id: 'prov_1', name: 'Ramesh Bhai', serviceType: 'plumber', locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     phone: '9876501001', whatsapp: '9876501001', recommendationCount: 5,
     notes: ['Fixed our bathroom leak same day, very honest about cost.', 'Came on time. Reasonable rates.', 'Has proper tools, no shortcuts.'],
     isVerified: true, recommenderIds: ['user_1', 'user_2', 'user_3', 'user_4', 'user_5'],
     createdAt: '2024-01-10T10:00:00Z', lastRecommendedAt: hours(48)
   },
   {
-    id: 'prov_2', name: 'Sunita Tai', serviceType: 'cook', locality: 'Kharghar Sector 20',
+    id: 'prov_2', name: 'Sunita Tai', serviceType: 'cook', locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     phone: '9876501002', whatsapp: '9876501002', recommendationCount: 4,
     notes: ['Makes excellent Maharashtrian food. Very reliable.', 'Always on time, excellent hygiene.', 'Been working with us 2 years. Trustworthy.'],
     isVerified: true, recommenderIds: ['user_1', 'user_3', 'user_4', 'user_5'],
     createdAt: '2024-01-12T10:00:00Z', lastRecommendedAt: hours(24)
   },
   {
-    id: 'prov_3', name: 'Meena Bai', serviceType: 'maid', locality: 'Nerul Sector 25',
+    id: 'prov_3', name: 'Meena Bai', serviceType: 'maid', locality: 'Nerul, Navi Mumbai', city: 'Navi Mumbai',
     phone: '9876501003', whatsapp: '9876501003', recommendationCount: 6,
     notes: ['Very trustworthy. Works in our building for 3 years.', 'Does thorough cleaning, never cuts corners.', 'Available part-time or full-time.'],
     isVerified: true, recommenderIds: ['user_1', 'user_2', 'user_3', 'user_4', 'user_5', 'admin_1'],
@@ -421,7 +421,7 @@ export const DEMO_BUSINESSES = [
     description: 'Authorised pharmacy with licensed chemists. Generic and branded medicines. Blood pressure, sugar & BMI check available. Delivery to Kharghar and Kamothe.',
     phone: '9820001002',
     whatsapp: '9820001002',
-    locality: 'Kharghar Sector 20',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     address: 'Shop 7, Arihant Complex, Sector 20, Kharghar',
     isVerified: true,
     rating: 4.4,
@@ -481,7 +481,7 @@ export const DEMO_BUSINESSES = [
     description: '5,000 sq ft air-conditioned gym. Cardio zone, free weights, and group classes. Monthly ₹1,200. Annual ₹10,000. Certified trainers for weight loss and muscle building. Ladies batch 6 AM–8 AM.',
     phone: '9820001005',
     whatsapp: '9820001005',
-    locality: 'Kharghar Sector 10',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     address: 'Level 2, Sports Complex, Near Central Park, Sector 10',
     isVerified: true,
     rating: 4.5,
@@ -501,7 +501,7 @@ export const DEMO_BUSINESSES = [
     description: 'Small batch coaching for Std 8–12. Maths, Physics, Chemistry. JEE and NEET foundation batches. Ex-IIT faculty for Maths. Doubt clearing on WhatsApp. Free demo class.',
     phone: '9820001006',
     whatsapp: '9820001006',
-    locality: 'Kharghar Sector 20',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     address: 'Room 12, Shree Arcade, Behind KV School, Sector 20',
     isVerified: true,
     rating: 4.7,
@@ -689,7 +689,7 @@ export const COMPLAINT_CATEGORIES = [
 
 export const DEMO_CIVIC_POSTS = [
   {
-    id: 'civic_1', type: 'right_now', userId: 'user_1', locality: 'Kharghar Sector 20',
+    id: 'civic_1', type: 'right_now', userId: 'user_1', locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     category: 'civic', civicSubcategory: 'water', civicStatus: 'confirmed_by_locals',
     content: 'Kharghar Sector 20 mein aaj subah se pani pressure bahut kam hai. Kaafi logo ko problem ho rahi hai.',
     createdAt: hours(3), expiresAt: new Date(Date.now() + 9 * 3600000).toISOString(),
@@ -721,7 +721,7 @@ export const DEMO_CIVIC_POSTS = [
     status: 'active', isPinned: false, reportCount: 0, isFlagged: false,
   },
   {
-    id: 'civic_5', type: 'right_now', userId: 'user_4', locality: 'Nerul Sector 25',
+    id: 'civic_5', type: 'right_now', userId: 'user_4', locality: 'Nerul, Navi Mumbai', city: 'Navi Mumbai',
     category: 'civic', civicSubcategory: 'drainage', civicStatus: 'reported',
     content: 'Drainage overflow near Sector 25 school gate after yesterday rain. Road waterlogged, risky for kids.',
     createdAt: hours(5), expiresAt: new Date(Date.now() + 7 * 3600000).toISOString(),
@@ -746,7 +746,7 @@ export const SHOP_CATEGORIES = [
 export const DEMO_BUY_POSTS = [
   {
     id: 'buy_1', type: 'need_it_now', userId: 'user_1',
-    locality: 'Kharghar Sector 20', category: 'need_to_buy',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai', category: 'need_to_buy',
     content: 'Need 2 modular 16A sockets and 1 three-pin plug. Today within 1 hour. Delivery preferred.',
     needToBuyItem: 'Modular 16A sockets + plug', needToBuyQty: '3 pieces',
     deliveryPref: 'delivery', budget: 250,
@@ -825,7 +825,7 @@ export const MEDICAL_SUBCATEGORIES = [
 export const DEMO_MEDICAL_POSTS = [
   {
     id: 'med_1', type: 'right_now', userId: 'user_2',
-    locality: 'Kharghar Sector 20', category: 'medical',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai', category: 'medical',
     medicalSubcategory: 'blood',
     content: 'O+ blood needed urgently at Fortis Hospital Vashi — surgery scheduled for tomorrow morning. Please contact if you can donate. Very urgent.',
     createdAt: mins(15), expiresAt: hoursAhead(12), status: 'active', reportCount: 0,
@@ -878,7 +878,7 @@ export const DEMO_MEDICAL_BUSINESSES = [
     description: 'Full-service outpatient clinic. General physician, paediatrician (Mon/Wed/Fri), ENT (Sat). ECG, blood tests, nebulisation on-site. Home visit available for senior citizens. English, Hindi, Marathi.',
     phone: '9820002001',
     whatsapp: '9820002001',
-    locality: 'Kharghar Sector 20',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     address: 'Shop 3, Shivam Complex, Near Sector 20 Bus Stand, Kharghar',
     isVerified: true,
     rating: 4.5,
@@ -995,7 +995,7 @@ export const DEMO_EDUCATION_BUSINESSES = [
     description: 'All-in-one performing arts academy. Music: vocals (Indian classical, Bollywood), keyboard, guitar. Dance: Bharatanatyam, Bollywood, Zumba. Kids batches on weekends. Adult batches on weekdays evenings.',
     phone: '9820004002',
     whatsapp: '9820004002',
-    locality: 'Kharghar Sector 20',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     address: 'First Floor, Sai Complex, Sector 20, Kharghar',
     isVerified: true,
     rating: 4.6,
@@ -1077,7 +1077,7 @@ export const DEMO_WELLNESS_BUSINESSES = [
     description: 'Holistic wellness centre offering yoga (Hatha, Vinyasa, Yin), guided meditation, sound healing, and aromatherapy sessions. Batch size limited to 8. Monthly memberships and single sessions available. First session free.',
     phone: '9820005001',
     whatsapp: '9820005001',
-    locality: 'Kharghar Sector 20',
+    locality: 'Kharghar, Navi Mumbai', city: 'Navi Mumbai',
     address: 'B-Wing, Harmony Heights, Near Central Park, Sector 20, Kharghar',
     isVerified: true,
     rating: 4.8,
@@ -1108,4 +1108,226 @@ export const DEMO_WELLNESS_BUSINESSES = [
     openHours: '9:00 AM – 7:00 PM (Mon–Sat, Sun by appointment)',
     tags: ['naturopathy', 'panchakarma', 'massage', 'Shirodhara', 'Ayurveda', 'detox'],
   },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTI-CITY DEMO DATA — appended to demoData.js
+// Cities: Mumbai, Pune, Bengaluru, Delhi NCR (Gurgaon), Hyderabad,
+//         Chennai, Ahmedabad, Jaipur, Kolkata, Lucknow
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DEMO_MULTICITY_POSTS = [
+  // ── Mumbai: Bandra West ─────────────────────────────────────────────────
+  { id: 'mc_post_1', type: 'right_now', category: 'traffic', userId: 'demo_1',
+    locality: 'Bandra West, Mumbai', city: 'Mumbai', state: 'Maharashtra',
+    title: 'Bandra-Worli Sea Link jam both sides',
+    content: 'Massive jam on Sea Link towards Worli. Backup till toll plaza. Take Carter Road route.',
+    createdAt: new Date(Date.now() - 1000*60*22).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*5).toISOString(),
+    status: 'active', stillHappeningCount: 7, confirmedBy: [], reportCount: 0 },
+
+  { id: 'mc_post_2', type: 'need_now', category: 'borrow_lend', userId: 'demo_2',
+    locality: 'Bandra West, Mumbai', city: 'Mumbai', state: 'Maharashtra',
+    title: 'Need a projector for 2 hours today',
+    content: 'House presentation at 6 PM. Need HDMI projector. Will return by 9 PM. Can pick up.',
+    neededBy: new Date(Date.now() + 1000*60*60*3).toISOString(),
+    createdAt: new Date(Date.now() - 1000*60*40).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*6).toISOString(),
+    status: 'active', helperCount: 1, stillHappeningCount: 0, confirmedBy: [], reportCount: 0 },
+
+  // ── Pune: Koregaon Park ─────────────────────────────────────────────────
+  { id: 'mc_post_3', type: 'right_now', category: 'water', userId: 'demo_3',
+    locality: 'Koregaon Park, Pune', city: 'Pune', state: 'Maharashtra',
+    title: 'Water supply suspended till 4 PM',
+    content: 'PMC pipe repair work near North Main Rd. Supply off from 10 AM. Stock up.',
+    createdAt: new Date(Date.now() - 1000*60*55).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*4).toISOString(),
+    status: 'active', stillHappeningCount: 12, confirmedBy: [], reportCount: 0 },
+
+  { id: 'mc_post_4', type: 'need_now', category: 'ride_share', userId: 'demo_4',
+    locality: 'Baner, Pune', city: 'Pune', state: 'Maharashtra',
+    title: 'Cab share to Pune Airport 5:30 AM tomorrow',
+    content: 'Early morning flight. Anyone from Baner/Balewadi going to airport? Share cab cost.',
+    neededBy: new Date(Date.now() + 1000*60*60*11).toISOString(),
+    createdAt: new Date(Date.now() - 1000*60*90).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*12).toISOString(),
+    status: 'active', helperCount: 0, stillHappeningCount: 0, confirmedBy: [], reportCount: 0 },
+
+  // ── Bengaluru: Koramangala ───────────────────────────────────────────────
+  { id: 'mc_post_5', type: 'right_now', category: 'power', userId: 'demo_5',
+    locality: 'Koramangala, Bengaluru', city: 'Bengaluru', state: 'Karnataka',
+    title: 'BESCOM power cut 4th Block area',
+    content: 'Unscheduled cut since 2 PM. BESCOM helpline says 3-4 hrs. 5th and 6th blocks okay.',
+    createdAt: new Date(Date.now() - 1000*60*35).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*3).toISOString(),
+    status: 'active', stillHappeningCount: 19, confirmedBy: [], reportCount: 0 },
+
+  { id: 'mc_post_6', type: 'need_now', category: 'borrow_lend', userId: 'demo_6',
+    locality: 'Indiranagar, Bengaluru', city: 'Bengaluru', state: 'Karnataka',
+    title: 'Anyone have a steam iron to lend for 1 hr?',
+    content: 'Function tonight, my iron broke. Need for 30 mins. 100 Block area.',
+    neededBy: new Date(Date.now() + 1000*60*120).toISOString(),
+    createdAt: new Date(Date.now() - 1000*60*15).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*4).toISOString(),
+    status: 'active', helperCount: 2, stillHappeningCount: 0, confirmedBy: [], reportCount: 0 },
+
+  // ── Gurgaon: Sector 56 ───────────────────────────────────────────────────
+  { id: 'mc_post_7', type: 'right_now', category: 'transport', userId: 'demo_7',
+    locality: 'Sector 56, Gurgaon', city: 'Gurgaon', state: 'Delhi NCR',
+    title: 'Rapid Metro on Sikanderpur route delayed 45 min',
+    content: 'Technical fault at Cyber City station. Buses running as alternate. Massive crowd.',
+    createdAt: new Date(Date.now() - 1000*60*28).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*2).toISOString(),
+    status: 'active', stillHappeningCount: 9, confirmedBy: [], reportCount: 0 },
+
+  // ── Hyderabad: Kondapur ──────────────────────────────────────────────────
+  { id: 'mc_post_8', type: 'right_now', category: 'civic', userId: 'demo_8',
+    locality: 'Kondapur, Hyderabad', city: 'Hyderabad', state: 'Telangana',
+    title: 'Road dug up near Botanical Garden junction',
+    content: 'HMWSSB pipeline work. One lane blocked. Take Gachibowli flyover instead.',
+    createdAt: new Date(Date.now() - 1000*60*100).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*8).toISOString(),
+    status: 'active', stillHappeningCount: 5, confirmedBy: [], reportCount: 0 },
+
+  { id: 'mc_post_9', type: 'need_now', category: 'urgent_help', userId: 'demo_9',
+    locality: 'Gachibowli, Hyderabad', city: 'Hyderabad', state: 'Telangana',
+    title: 'Plumber needed urgently — pipe burst',
+    content: 'Kitchen pipe burst, water everywhere. Need plumber NOW. Will pay extra. Ground floor flat.',
+    neededBy: new Date(Date.now() + 1000*60*30).toISOString(),
+    createdAt: new Date(Date.now() - 1000*60*8).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*2).toISOString(),
+    status: 'active', helperCount: 3, stillHappeningCount: 0, confirmedBy: [], reportCount: 0 },
+
+  // ── Chennai: Velachery ───────────────────────────────────────────────────
+  { id: 'mc_post_10', type: 'right_now', category: 'weather', userId: 'demo_1',
+    locality: 'Velachery, Chennai', city: 'Chennai', state: 'Tamil Nadu',
+    title: 'Heavy rain, Velachery lake area flooding',
+    content: 'Waterlogging on 200 Feet Road. Avoid Vijaya Nagar stretch. 100 mm rain in 2 hrs.',
+    createdAt: new Date(Date.now() - 1000*60*18).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*3).toISOString(),
+    status: 'active', stillHappeningCount: 31, confirmedBy: [], reportCount: 0 },
+
+  // ── Ahmedabad: Satellite ─────────────────────────────────────────────────
+  { id: 'mc_post_11', type: 'need_now', category: 'borrow_lend', userId: 'demo_2',
+    locality: 'Satellite, Ahmedabad', city: 'Ahmedabad', state: 'Gujarat',
+    title: 'Need cricket bat for evening match',
+    content: 'Friendly match at Jodhpur ground at 5 PM. Need full-size bat. Will return same evening.',
+    neededBy: new Date(Date.now() + 1000*60*180).toISOString(),
+    createdAt: new Date(Date.now() - 1000*60*60).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*6).toISOString(),
+    status: 'active', helperCount: 1, stillHappeningCount: 0, confirmedBy: [], reportCount: 0 },
+
+  // ── Jaipur: Vaishali Nagar ───────────────────────────────────────────────
+  { id: 'mc_post_12', type: 'right_now', category: 'safety', userId: 'demo_3',
+    locality: 'Vaishali Nagar, Jaipur', city: 'Jaipur', state: 'Rajasthan',
+    title: 'Stray dog pack near Central Park entrance',
+    content: '5-6 dogs attacking people near Gate 2. Avoid evening walk there. JMC complaint filed.',
+    createdAt: new Date(Date.now() - 1000*60*45).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*6).toISOString(),
+    status: 'active', stillHappeningCount: 4, confirmedBy: [], reportCount: 0 },
+
+  // ── Kolkata: Salt Lake ───────────────────────────────────────────────────
+  { id: 'mc_post_13', type: 'need_now', category: 'local_errand', userId: 'demo_4',
+    locality: 'Salt Lake, Kolkata', city: 'Kolkata', state: 'West Bengal',
+    title: 'Medicine delivery needed — Sector V area',
+    content: 'Father-in-law unwell. Need someone to pick up medicine from Sector V pharmacy to CB Block.',
+    neededBy: new Date(Date.now() + 1000*60*60).toISOString(),
+    createdAt: new Date(Date.now() - 1000*60*20).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*3).toISOString(),
+    status: 'active', helperCount: 1, stillHappeningCount: 0, confirmedBy: [], reportCount: 0 },
+
+  // ── Lucknow: Gomti Nagar ─────────────────────────────────────────────────
+  { id: 'mc_post_14', type: 'right_now', category: 'traffic', userId: 'demo_5',
+    locality: 'Gomti Nagar, Lucknow', city: 'Lucknow', state: 'Uttar Pradesh',
+    title: 'VIP movement, Shaheed Path fully blocked',
+    content: 'CM convoy expected at 3 PM. Shaheed Path closed both ways. Use Kanpur Road.',
+    createdAt: new Date(Date.now() - 1000*60*12).toISOString(),
+    expiresAt: new Date(Date.now() + 1000*60*60*2).toISOString(),
+    status: 'active', stillHappeningCount: 22, confirmedBy: [], reportCount: 0 },
+]
+
+export const DEMO_MULTICITY_PROVIDERS = [
+  { id: 'mc_prov_1', name: 'Santosh Kumar', serviceType: 'plumber', locality: 'Bandra West, Mumbai',
+    city: 'Mumbai', state: 'Maharashtra',
+    description: 'Expert plumber. Emergency calls 24/7. 10 years experience. Reasonable rates.',
+    phone: '9819001001', recommendationCount: 14, isVerified: true,
+    createdAt: new Date(Date.now() - 1000*60*60*24*10).toISOString() },
+  { id: 'mc_prov_2', name: 'Priya Deshpande', serviceType: 'tutor', locality: 'Koregaon Park, Pune',
+    city: 'Pune', state: 'Maharashtra',
+    description: 'Maths and Science tutor. Classes 8-12, JEE foundation. Very patient.',
+    phone: '9765002002', recommendationCount: 8, isVerified: true,
+    createdAt: new Date(Date.now() - 1000*60*60*24*20).toISOString() },
+  { id: 'mc_prov_3', name: 'Ravi Naidu', serviceType: 'electrician', locality: 'Koramangala, Bengaluru',
+    city: 'Bengaluru', state: 'Karnataka',
+    description: 'Licensed electrician. Wiring, inverter installation, AC fitting. Available evenings.',
+    phone: '9844003003', recommendationCount: 22, isVerified: true,
+    createdAt: new Date(Date.now() - 1000*60*60*24*5).toISOString() },
+  { id: 'mc_prov_4', name: 'Savita Mehta', serviceType: 'maid', locality: 'Satellite, Ahmedabad',
+    city: 'Ahmedabad', state: 'Gujarat',
+    description: 'Cook + cleaning. Gujarati and Punjabi food. Available mornings 7-11 AM.',
+    phone: '9979004004', recommendationCount: 11, isVerified: false,
+    createdAt: new Date(Date.now() - 1000*60*60*24*15).toISOString() },
+  { id: 'mc_prov_5', name: 'Mohammed Imran', serviceType: 'driver', locality: 'Kondapur, Hyderabad',
+    city: 'Hyderabad', state: 'Telangana',
+    description: 'Full-time or part-time driver. Outstation trips okay. Heavy vehicle license.',
+    phone: '9890005005', recommendationCount: 6, isVerified: false,
+    createdAt: new Date(Date.now() - 1000*60*60*24*8).toISOString() },
+  { id: 'mc_prov_6', name: 'Lakshmi Iyer', serviceType: 'cook', locality: 'Adyar, Chennai',
+    city: 'Chennai', state: 'Tamil Nadu',
+    description: 'South Indian and North Indian. Tiffin service available. No onion-garlic on request.',
+    phone: '9840006006', recommendationCount: 18, isVerified: true,
+    createdAt: new Date(Date.now() - 1000*60*60*24*30).toISOString() },
+  { id: 'mc_prov_7', name: 'Amit Singh', serviceType: 'carpenter', locality: 'Gomti Nagar, Lucknow',
+    city: 'Lucknow', state: 'Uttar Pradesh',
+    description: 'Furniture repair, modular kitchen fitting. Custom woodwork. Reasonable rates.',
+    phone: '9936007007', recommendationCount: 9, isVerified: false,
+    createdAt: new Date(Date.now() - 1000*60*60*24*12).toISOString() },
+  { id: 'mc_prov_8', name: 'Sunil Kapoor', serviceType: 'plumber', locality: 'Sector 56, Gurgaon',
+    city: 'Gurgaon', state: 'Delhi NCR',
+    description: 'All plumbing work. Bathroom fittings, geyser installation, drainage cleaning.',
+    phone: '9811008008', recommendationCount: 16, isVerified: true,
+    createdAt: new Date(Date.now() - 1000*60*60*24*7).toISOString() },
+]
+
+export const DEMO_MULTICITY_BUSINESSES = [
+  { id: 'mc_biz_1', name: 'Khichdi Kitchen', category: 'food', plan: 'standard',
+    tagline: 'Home-cooked tiffins delivered hot',
+    description: 'Daily tiffin service. Veg and non-veg. Delivery in Bandra and Khar.',
+    phone: '9820101001', whatsapp: '9820101001', locality: 'Bandra West, Mumbai',
+    city: 'Mumbai', state: 'Maharashtra',
+    rating: 4.6, reviewCount: 41, isVerified: true,
+    tags: ['tiffin', 'home food', 'delivery', 'veg'],
+    createdAt: new Date(Date.now() - 1000*60*60*24*25).toISOString() },
+  { id: 'mc_biz_2', name: 'TechFix Koramangala', category: 'electronics', plan: 'basic',
+    tagline: 'Phone and laptop repair same-day',
+    description: 'Screen replacement, battery swap, data recovery. iPhones and Android.',
+    phone: '9844102002', whatsapp: '9844102002', locality: 'Koramangala, Bengaluru',
+    city: 'Bengaluru', state: 'Karnataka',
+    rating: 4.3, reviewCount: 67, isVerified: true,
+    tags: ['phone repair', 'laptop', 'screen replacement', 'same-day'],
+    createdAt: new Date(Date.now() - 1000*60*60*24*40).toISOString() },
+  { id: 'mc_biz_3', name: 'Dr. Sunita Desai Clinic', category: 'medical', plan: 'premium',
+    tagline: 'General physician — walk-in welcome',
+    description: 'MBBS, MD. General medicine, fever, BP, diabetes management. Consultation ₹200.',
+    phone: '9765103003', whatsapp: null, locality: 'Baner, Pune',
+    city: 'Pune', state: 'Maharashtra',
+    rating: 4.8, reviewCount: 122, isVerified: true,
+    tags: ['doctor', 'GP', 'general physician', 'walk-in', 'consultation'],
+    createdAt: new Date(Date.now() - 1000*60*60*24*60).toISOString() },
+  { id: 'mc_biz_4', name: 'Fresh Basket Delivery', category: 'grocery', plan: 'standard',
+    tagline: 'Farm fresh vegetables, 2-hr delivery',
+    description: 'Organic vegetables and fruits. Min order ₹150. Free delivery above ₹300.',
+    phone: '9979104004', whatsapp: '9979104004', locality: 'Satellite, Ahmedabad',
+    city: 'Ahmedabad', state: 'Gujarat',
+    rating: 4.4, reviewCount: 33, isVerified: false,
+    tags: ['vegetables', 'fruits', 'organic', 'delivery'],
+    createdAt: new Date(Date.now() - 1000*60*60*24*18).toISOString() },
+  { id: 'mc_biz_5', name: 'Hyderabad Packers & Movers', category: 'services', plan: 'basic',
+    tagline: 'Local shifting from ₹999',
+    description: 'Within-city home shifting. Packing materials provided. Insurance available.',
+    phone: '9890105005', whatsapp: '9890105005', locality: 'Madhapur, Hyderabad',
+    city: 'Hyderabad', state: 'Telangana',
+    rating: 4.0, reviewCount: 28, isVerified: false,
+    tags: ['packers', 'movers', 'shifting', 'relocation'],
+    createdAt: new Date(Date.now() - 1000*60*60*24*35).toISOString() },
 ]

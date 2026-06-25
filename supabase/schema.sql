@@ -56,7 +56,7 @@ BEGIN
   ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
   ALTER TABLE public.profiles
     ADD CONSTRAINT profiles_role_check
-    CHECK (role IN ('resident', 'admin', 'moderator', 'society_admin', 'business_owner'));
+    CHECK (role IN ('resident', 'admin', 'moderator', 'society_admin', 'business_owner', 'shop_owner'));
 END $$;
 
 CREATE TABLE IF NOT EXISTS public.posts (
@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS public.posts (
   distance_range        TEXT DEFAULT '2km',
   helper_count          INTEGER NOT NULL DEFAULT 0,
   is_fulfilled          BOOLEAN NOT NULL DEFAULT false,
+  selected_quote_id     UUID,
+  is_bought             BOOLEAN NOT NULL DEFAULT false,
+  need_to_buy_item      TEXT,
+  need_to_buy_qty       TEXT,
+  delivery_pref         TEXT NOT NULL DEFAULT 'either'
+                          CHECK (delivery_pref IN ('delivery','pickup','either')),
+  budget_paise          INTEGER CHECK (budget_paise IS NULL OR budget_paise >= 0),
   reminder_sent_at      TIMESTAMPTZ,
   is_boosted            BOOLEAN NOT NULL DEFAULT false,
   boosted_until         TIMESTAMPTZ,
@@ -102,7 +109,13 @@ ALTER TABLE public.posts
   ADD COLUMN IF NOT EXISTS civic_digest_sent_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS medical_context TEXT,
   ADD COLUMN IF NOT EXISTS medical_urgency TEXT,
-  ADD COLUMN IF NOT EXISTS medical_disclaimer_accepted BOOLEAN NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS medical_disclaimer_accepted BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS selected_quote_id UUID,
+  ADD COLUMN IF NOT EXISTS is_bought BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS need_to_buy_item TEXT,
+  ADD COLUMN IF NOT EXISTS need_to_buy_qty TEXT,
+  ADD COLUMN IF NOT EXISTS delivery_pref TEXT NOT NULL DEFAULT 'either',
+  ADD COLUMN IF NOT EXISTS budget_paise INTEGER;
 
 DO $$
 BEGIN
@@ -189,10 +202,19 @@ CREATE TABLE IF NOT EXISTS public.societies (
   id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name           TEXT NOT NULL,
   locality       TEXT NOT NULL DEFAULT 'Kharghar',
+  sector         TEXT,
+  landmark       TEXT,
+  description    TEXT,
+  rules          TEXT,
   address        TEXT,
   city           TEXT NOT NULL DEFAULT 'Navi Mumbai',
   pincode        TEXT,
+  status         TEXT NOT NULL DEFAULT 'active'
+                   CHECK (status IN ('pending','active','rejected','archived')),
   admin_id       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  contact_phone  TEXT,
+  public_contact TEXT,
+  total_flats    INTEGER CHECK (total_flats IS NULL OR total_flats > 0),
   is_verified    BOOLEAN NOT NULL DEFAULT false,
   is_pro         BOOLEAN NOT NULL DEFAULT false,
   pro_expires_at TIMESTAMPTZ,
@@ -201,14 +223,45 @@ CREATE TABLE IF NOT EXISTS public.societies (
 );
 
 ALTER TABLE public.societies
+  ADD COLUMN IF NOT EXISTS sector TEXT,
+  ADD COLUMN IF NOT EXISTS landmark TEXT,
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS rules TEXT,
   ADD COLUMN IF NOT EXISTS address TEXT,
   ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT 'Navi Mumbai',
   ADD COLUMN IF NOT EXISTS pincode TEXT,
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active',
   ADD COLUMN IF NOT EXISTS admin_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS contact_phone TEXT,
+  ADD COLUMN IF NOT EXISTS public_contact TEXT,
+  ADD COLUMN IF NOT EXISTS total_flats INTEGER,
   ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS is_pro BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS pro_expires_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE TABLE IF NOT EXISTS public.society_registration_requests (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  requested_by   UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  society_name   TEXT NOT NULL,
+  city           TEXT,
+  locality       TEXT NOT NULL,
+  sector         TEXT,
+  landmark       TEXT,
+  total_flats    INTEGER CHECK (total_flats IS NULL OR total_flats > 0),
+  requester_role TEXT NOT NULL
+                   CHECK (requester_role IN ('resident','committee','secretary','chairman','manager','other')),
+  contact_phone  TEXT,
+  proof_note     TEXT,
+  status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending','approved','rejected')),
+  society_id     UUID REFERENCES public.societies(id) ON DELETE SET NULL,
+  reviewed_by    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  reviewed_at    TIMESTAMPTZ,
+  admin_note     TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 DO $$
 BEGIN
@@ -285,10 +338,22 @@ CREATE TABLE IF NOT EXISTS public.society_members (
   status      TEXT NOT NULL DEFAULT 'pending'
                 CHECK (status IN ('pending','approved','rejected','left')),
   joined_at   TIMESTAMPTZ,
+  requested_at TIMESTAMPTZ,
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  approved_at TIMESTAMPTZ,
+  approved_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (society_id, user_id)
 );
+
+ALTER TABLE public.society_members
+  ADD COLUMN IF NOT EXISTS requested_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- PHASE 4 — MONETIZATION FOUNDATION
@@ -298,6 +363,7 @@ CREATE TABLE IF NOT EXISTS public.businesses (
   id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name            TEXT NOT NULL,
   category        TEXT NOT NULL,
+  city            TEXT,
   plan            TEXT NOT NULL DEFAULT 'basic'
                     CHECK (plan IN ('basic', 'standard', 'premium')),
   tagline         TEXT,
@@ -310,9 +376,39 @@ CREATE TABLE IF NOT EXISTS public.businesses (
   rating          NUMERIC(2,1) NOT NULL DEFAULT 0,
   review_count    INTEGER NOT NULL DEFAULT 0,
   owner_id        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  open_hours      TEXT,
+  tags            TEXT[] NOT NULL DEFAULT '{}',
   plan_expires_at TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.businesses
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS open_hours TEXT,
+  ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS public.business_registration_requests (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  requested_by   UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  business_name  TEXT NOT NULL,
+  category       TEXT NOT NULL,
+  city           TEXT,
+  locality       TEXT NOT NULL,
+  landmark       TEXT,
+  contact_phone  TEXT,
+  whatsapp       TEXT,
+  open_hours     TEXT,
+  description    TEXT,
+  proof_note     TEXT,
+  status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending','approved','rejected')),
+  business_id    UUID REFERENCES public.businesses(id) ON DELETE SET NULL,
+  reviewed_by    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  reviewed_at    TIMESTAMPTZ,
+  admin_note     TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.post_boosts (
@@ -416,6 +512,19 @@ CREATE TABLE IF NOT EXISTS public.quotes (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'posts_selected_quote_id_fkey'
+      AND conrelid = 'public.posts'::regclass
+  ) THEN
+    ALTER TABLE public.posts
+      ADD CONSTRAINT posts_selected_quote_id_fkey
+      FOREIGN KEY (selected_quote_id) REFERENCES public.quotes(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -436,10 +545,20 @@ CREATE INDEX IF NOT EXISTS idx_post_confirmations_user ON public.post_confirmati
 CREATE INDEX IF NOT EXISTS idx_providers_service       ON public.providers(service_type);
 CREATE INDEX IF NOT EXISTS idx_providers_locality      ON public.providers(locality);
 CREATE INDEX IF NOT EXISTS idx_replies_post_id         ON public.replies(post_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_quick_reply_per_user_post
+  ON public.replies (post_id, user_id, reply_type)
+  WHERE reply_type IN ('still_happening', 'i_can_help', 'i_know_someone')
+    AND is_hidden = false;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_custom_reply_exact_per_user_post
+  ON public.replies (post_id, user_id, lower(trim(content)))
+  WHERE reply_type = 'custom'
+    AND is_hidden = false;
 CREATE INDEX IF NOT EXISTS idx_reports_status          ON public.reports(status);
 
 CREATE INDEX IF NOT EXISTS idx_societies_locality       ON public.societies(locality);
 CREATE INDEX IF NOT EXISTS idx_societies_admin          ON public.societies(admin_id);
+CREATE INDEX IF NOT EXISTS idx_society_registration_requests_status ON public.society_registration_requests(status);
+CREATE INDEX IF NOT EXISTS idx_society_registration_requests_user   ON public.society_registration_requests(requested_by);
 CREATE INDEX IF NOT EXISTS idx_society_posts_society    ON public.society_posts(society_id);
 CREATE INDEX IF NOT EXISTS idx_society_posts_type       ON public.society_posts(type);
 CREATE INDEX IF NOT EXISTS idx_society_posts_visibility ON public.society_posts(visibility);
@@ -454,6 +573,8 @@ CREATE INDEX IF NOT EXISTS idx_businesses_locality ON public.businesses(locality
 CREATE INDEX IF NOT EXISTS idx_businesses_category ON public.businesses(category);
 CREATE INDEX IF NOT EXISTS idx_businesses_plan     ON public.businesses(plan);
 CREATE INDEX IF NOT EXISTS idx_businesses_owner    ON public.businesses(owner_id);
+CREATE INDEX IF NOT EXISTS idx_business_registration_requests_status ON public.business_registration_requests(status);
+CREATE INDEX IF NOT EXISTS idx_business_registration_requests_user   ON public.business_registration_requests(requested_by);
 
 CREATE INDEX IF NOT EXISTS idx_post_boosts_post ON public.post_boosts(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_boosts_user ON public.post_boosts(user_id);
@@ -476,6 +597,10 @@ CREATE INDEX IF NOT EXISTS idx_complaints_status  ON public.complaints(status);
 CREATE INDEX IF NOT EXISTS idx_quotes_post     ON public.quotes(post_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_business ON public.quotes(business_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_owner    ON public.quotes(shop_owner_id);
+CREATE INDEX IF NOT EXISTS idx_posts_selected_quote ON public.posts(selected_quote_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_active_quote_per_shop_post
+  ON public.quotes(post_id, shop_owner_id)
+  WHERE status <> 'withdrawn';
 CREATE INDEX IF NOT EXISTS idx_quotes_status   ON public.quotes(status);
 
 -- ============================================================
@@ -600,10 +725,12 @@ ALTER TABLE public.replies             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saved_posts         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.societies           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.society_registration_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.society_posts       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.push_subscriptions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.society_members     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.businesses          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_registration_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.post_boosts         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rsvps               ENABLE ROW LEVEL SECURITY;
@@ -614,8 +741,10 @@ ALTER TABLE public.quotes              ENABLE ROW LEVEL SECURITY;
 -- Recreate policies idempotently.
 DROP POLICY IF EXISTS "Public profiles visible to all" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update profiles" ON public.profiles;
 CREATE POLICY "Public profiles visible to all" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Admins can update profiles" ON public.profiles FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Active posts visible to all" ON public.posts;
 DROP POLICY IF EXISTS "Authenticated users can create posts" ON public.posts;
@@ -662,7 +791,16 @@ DROP POLICY IF EXISTS "Society admins can update society" ON public.societies;
 DROP POLICY IF EXISTS "Platform admins can manage societies" ON public.societies;
 CREATE POLICY "Verified societies visible to all" ON public.societies FOR SELECT USING (is_verified = true OR admin_id = auth.uid() OR public.is_society_member(id) OR public.is_admin());
 CREATE POLICY "Society admins can update society" ON public.societies FOR UPDATE USING (admin_id = auth.uid() OR public.is_society_admin(id));
-CREATE POLICY "Platform admins can manage societies" ON public.societies FOR ALL USING (public.is_admin());
+CREATE POLICY "Platform admins can manage societies" ON public.societies FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Users can create society registration requests" ON public.society_registration_requests;
+DROP POLICY IF EXISTS "Users can view own society registration requests" ON public.society_registration_requests;
+DROP POLICY IF EXISTS "Admins can view society registration requests" ON public.society_registration_requests;
+DROP POLICY IF EXISTS "Admins can update society registration requests" ON public.society_registration_requests;
+CREATE POLICY "Users can create society registration requests" ON public.society_registration_requests FOR INSERT WITH CHECK (auth.uid() = requested_by);
+CREATE POLICY "Users can view own society registration requests" ON public.society_registration_requests FOR SELECT USING (auth.uid() = requested_by);
+CREATE POLICY "Admins can view society registration requests" ON public.society_registration_requests FOR SELECT USING (public.is_admin());
+CREATE POLICY "Admins can update society registration requests" ON public.society_registration_requests FOR UPDATE USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Society posts visible by visibility" ON public.society_posts;
 DROP POLICY IF EXISTS "Society admins can create posts" ON public.society_posts;
@@ -690,10 +828,12 @@ CREATE POLICY "Users can delete own push subscriptions" ON public.push_subscript
 DROP POLICY IF EXISTS "Users can view own membership" ON public.society_members;
 DROP POLICY IF EXISTS "Approved society members visible to society" ON public.society_members;
 DROP POLICY IF EXISTS "Users can request membership" ON public.society_members;
+DROP POLICY IF EXISTS "Admins can insert society members" ON public.society_members;
 DROP POLICY IF EXISTS "Society admins can manage members" ON public.society_members;
 CREATE POLICY "Users can view own membership" ON public.society_members FOR SELECT USING (auth.uid() = user_id OR public.is_society_admin(society_id) OR public.is_admin());
 CREATE POLICY "Approved society members visible to society" ON public.society_members FOR SELECT USING (status = 'approved' AND public.is_society_member(society_id));
 CREATE POLICY "Users can request membership" ON public.society_members FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can insert society members" ON public.society_members FOR INSERT WITH CHECK (public.is_admin());
 CREATE POLICY "Society admins can manage members" ON public.society_members FOR UPDATE USING (public.is_society_admin(society_id) OR public.is_admin());
 
 DROP POLICY IF EXISTS "Anyone can view verified businesses" ON public.businesses;
@@ -701,9 +841,18 @@ DROP POLICY IF EXISTS "Owners can insert their business" ON public.businesses;
 DROP POLICY IF EXISTS "Owners can update their business" ON public.businesses;
 DROP POLICY IF EXISTS "Admins can manage all businesses" ON public.businesses;
 CREATE POLICY "Anyone can view verified businesses" ON public.businesses FOR SELECT USING (is_verified = true OR owner_id = auth.uid() OR public.is_admin());
-CREATE POLICY "Owners can insert their business" ON public.businesses FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their business" ON public.businesses FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Admins can manage all businesses" ON public.businesses FOR ALL USING (public.is_admin());
+CREATE POLICY "Owners can insert their business" ON public.businesses FOR INSERT WITH CHECK (auth.uid() = owner_id AND is_verified = false);
+CREATE POLICY "Owners can update their business" ON public.businesses FOR UPDATE USING (auth.uid() = owner_id) WITH CHECK (auth.uid() = owner_id AND is_verified = false);
+CREATE POLICY "Admins can manage all businesses" ON public.businesses FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Users can create business registration requests" ON public.business_registration_requests;
+DROP POLICY IF EXISTS "Users can view own business registration requests" ON public.business_registration_requests;
+DROP POLICY IF EXISTS "Admins can view business registration requests" ON public.business_registration_requests;
+DROP POLICY IF EXISTS "Admins can update business registration requests" ON public.business_registration_requests;
+CREATE POLICY "Users can create business registration requests" ON public.business_registration_requests FOR INSERT WITH CHECK (auth.uid() = requested_by);
+CREATE POLICY "Users can view own business registration requests" ON public.business_registration_requests FOR SELECT USING (auth.uid() = requested_by);
+CREATE POLICY "Admins can view business registration requests" ON public.business_registration_requests FOR SELECT USING (public.is_admin());
+CREATE POLICY "Admins can update business registration requests" ON public.business_registration_requests FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Users see own boosts" ON public.post_boosts;
 DROP POLICY IF EXISTS "Users can boost posts" ON public.post_boosts;
@@ -713,9 +862,9 @@ CREATE POLICY "Users can boost posts" ON public.post_boosts FOR INSERT WITH CHEC
 DROP POLICY IF EXISTS "Users can view own payments" ON public.payments;
 DROP POLICY IF EXISTS "Service role can insert payments" ON public.payments;
 DROP POLICY IF EXISTS "Service role can update payments" ON public.payments;
+DROP POLICY IF EXISTS "Admins can manage payments" ON public.payments;
 CREATE POLICY "Users can view own payments" ON public.payments FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
-CREATE POLICY "Service role can insert payments" ON public.payments FOR INSERT WITH CHECK (true);
-CREATE POLICY "Service role can update payments" ON public.payments FOR UPDATE USING (true);
+CREATE POLICY "Admins can manage payments" ON public.payments FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "Society members can view RSVPs" ON public.rsvps;
 DROP POLICY IF EXISTS "Users can RSVP" ON public.rsvps;
@@ -756,7 +905,16 @@ CREATE POLICY "Post owners and shops can view quotes" ON public.quotes FOR SELEC
   OR EXISTS (SELECT 1 FROM public.posts p WHERE p.id = quotes.post_id AND p.user_id = auth.uid())
   OR public.is_admin()
 );
-CREATE POLICY "Business owners can create quotes" ON public.quotes FOR INSERT WITH CHECK (auth.uid() = shop_owner_id);
+CREATE POLICY "Business owners can create quotes" ON public.quotes FOR INSERT WITH CHECK (
+  auth.uid() = shop_owner_id
+  AND (
+    business_id IS NULL
+    OR EXISTS (
+      SELECT 1 FROM public.businesses b
+      WHERE b.id = business_id AND b.owner_id = auth.uid()
+    )
+  )
+);
 CREATE POLICY "Shop owners can update own quotes" ON public.quotes FOR UPDATE USING (auth.uid() = shop_owner_id OR public.is_admin());
 
 -- ============================================================

@@ -7,26 +7,9 @@
 import React, { useState } from 'react'
 import { useApp } from '../context/AppContext'
 
-const ALL_LOCALITIES = [
-  'Kharghar Sector 1-5',
-  'Kharghar Sector 6-12',
-  'Kharghar Sector 13-20',
-  'Kharghar Sector 21-36',
-  'Kamothe',
-  'Nerul',
-  'Ulwe',
-  'Panvel',
-  'Bandra West',
-  'Bandra East',
-  'Powai',
-  'Seawoods',
-  'Vashi',
-  'Belapur',
-  'Airoli',
-  'Ghansoli',
-  'Kopar Khairane',
-  'Turbhe',
-]
+import { ALL_LOCALITIES as ALL_LOCALITY_DATA } from '../data/locationData'
+// Flat list of locality name strings for the switcher
+const LOCALITY_NAMES = ALL_LOCALITY_DATA.map(l => l.name || l.label || l)
 
 export default function LocalitySwitcherModal({ onClose }) {
   const { state, actions } = useApp()
@@ -34,7 +17,7 @@ export default function LocalitySwitcherModal({ onClose }) {
   const [searchQ, setSearchQ] = useState('')
 
   const cu = state.currentUser
-  const homeLocality = cu?.locality || 'Kharghar'
+  const homeLocality = cu?.locality || 'your area'
   const activeLocality = state.activeLocality   // null = Home
   const savedLocalities = state.savedLocalities || []
   const liveLocality = state.liveLocality
@@ -60,7 +43,7 @@ export default function LocalitySwitcherModal({ onClose }) {
     setSearchQ('')
   }
 
-  const filteredLocalities = ALL_LOCALITIES.filter(l =>
+  const filteredLocalities = LOCALITY_NAMES.filter(l =>
     l.toLowerCase().includes(searchQ.toLowerCase()) &&
     l !== homeLocality &&
     !savedLocalities.includes(l)

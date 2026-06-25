@@ -38,13 +38,13 @@ export default function HomeScreen() {
   const activeLocality = state.activeLocality  // null = Home, '__gps__' = GPS, string = saved
   const effectiveLocality = activeLocality === '__gps__'
     ? liveLocality
-    : activeLocality || state.currentUser?.locality || 'Kharghar'
+    : activeLocality || state.currentUser?.locality || 'your area'
 
   const localityLabel = activeLocality === '__gps__'
     ? (liveLocality ? `GPS: ${liveLocality}` : 'GPS')
-    : activeLocality || state.currentUser?.locality || 'Kharghar'
+    : activeLocality || state.currentUser?.locality || 'your area'
 
-  const homeArea = state.currentUser?.locality || 'Kharghar'
+  const homeArea = state.currentUser?.locality || 'your area'
 
   const liveBadgeLabel = isSupabaseConfigured
     ? `Live in ${(effectiveLocality || homeArea).split(',')[0].trim().split(' ').slice(0, 2).join(' ')}`
@@ -55,6 +55,10 @@ export default function HomeScreen() {
   // ── Locality-aware post filtering ──
   const matchesActiveLocality = (post) => {
     if (!isLocalityFiltered) return true
+    // City-gated locality filter: city must match before checking locality
+    const postCity = post.city || ''
+    const userCityStr = state.currentUser?.locality?.split(', ').pop() || ''
+    if (postCity && userCityStr && postCity !== userCityStr) return false
     return matchesLiveLocality(post.locality, effectiveLocality)
   }
 
@@ -155,7 +159,7 @@ export default function HomeScreen() {
     if (locationStatus === 'idle') {
       return (
         <div style={{ background: '#F8FAFC', borderBottom: '1px solid var(--border-light)', padding: '8px 16px', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>{state.currentUser?.locality || 'Kharghar'}</span>
+          <span>{state.currentUser?.locality || 'your area'}</span>
           <div style={{ flex: 1 }} />
           <button onClick={requestLocation} style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>Use live location</button>
         </div>

@@ -727,7 +727,7 @@ function SocietyPostForm({ type, societyId, showVisibility, onClose, onSaved }) 
               border: '1px solid #bae6fd', borderRadius: 10,
               fontSize: 13, color: '#0369a1'
             }}>
-              🌐 This post will appear in the public KhargharConnect feed
+              🌐 This post will appear in the public LocalSetu locality feed
             </div>
           )}
 

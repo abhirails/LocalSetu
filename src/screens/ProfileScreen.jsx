@@ -187,6 +187,22 @@ export default function ProfileScreen() {
                   <div className="menu-item-sub">{new Date(cu.joinedAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
                 </div>
               </div>
+              <button className="menu-item" onClick={() => navigate('/register-business')}>
+                <div className="menu-item-icon">🏪</div>
+                <div className="menu-item-text">
+                  <div className="menu-item-label">Register Business / Service</div>
+                  <div className="menu-item-sub">List your shop, clinic, tutor, or local service</div>
+                </div>
+                <div className="menu-item-arrow">›</div>
+              </button>
+              <button className="menu-item" onClick={() => navigate('/register-society')}>
+                <div className="menu-item-icon">🏘️</div>
+                <div className="menu-item-text">
+                  <div className="menu-item-label">Register Your Society</div>
+                  <div className="menu-item-sub">Add your housing society to LocalSetu</div>
+                </div>
+                <div className="menu-item-arrow">›</div>
+              </button>
             </div>
 
             <div style={{ padding: '0 14px', marginBottom: 16 }}>

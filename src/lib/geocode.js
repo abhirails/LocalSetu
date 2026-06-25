@@ -40,9 +40,16 @@ export async function reverseGeocode(lat, lng) {
  * "Bandra" matches "Bandra West".
  */
 export function matchesLiveLocality(postLocality, liveLocality) {
-  if (!liveLocality || !postLocality) return false
-  const live = liveLocality.toLowerCase().trim()
-  const post = postLocality.toLowerCase().trim()
+  if (!liveLocality || !postLocality) return true  // no filter if either missing
+  // Extract base area name: strip "Sector N", trailing digits, city suffix after comma
+  const baseArea = (loc) => loc.toLowerCase()
+    .split(',')[0]                          // drop ", CityName"
+    .replace(/\bsector\s+\d+\b/gi, '')     // drop "Sector 20"
+    .replace(/\s+\d+\b/g, '')               // drop trailing numbers
+    .trim()
+  const live = baseArea(liveLocality)
+  const post = baseArea(postLocality)
+  if (!live || !post) return true
   return post.includes(live) || live.includes(post)
 }
 
