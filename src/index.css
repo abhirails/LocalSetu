@@ -1,6 +1,5 @@
 @import "tailwindcss";
-@source ".";
-@source "../index.html";
+
 
 
 
@@ -10,20 +9,20 @@
 
 :root {
   /* Upgrade to premium teal from Stitch */
-  --primary: #00685e;
-  --primary-light: #f0fdfa;
-  --primary-dark: #005049;
-  --saffron: #FF9933;
-  --marigold: #F5A623;
-  --navy: #141b2b;
-  --navy-light: #293040;
+  --primary: #005c55;
+  --primary-light: #eff4ff;
+  --primary-dark: #134e4a;
+  --saffron: #fed01b;
+  --marigold: #735c00;
+  --navy: #0b1c30;
+  --navy-light: #213145;
 
   /* Premium Warm Light Theme */
-  --bg: #f9f9ff;
-  --bg-alt: #f1f3ff;
+  --bg: #f8f9ff;
+  --bg-alt: #f8fafc;
   --card: #ffffff;
-  --card-border: #bcc9c6;
-  --card-shadow: 0 4px 16px rgba(0, 104, 94, 0.04);
+  --card-border: #bdc9c6;
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 
   --text-primary: #1E1F24;
   --text-secondary: #525866;
@@ -99,54 +98,67 @@
    Reset & Base
    ============================== */
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f8fafc;
+    background-image: 
+      radial-gradient(#e2e8f0 1px, transparent 1px),
+      radial-gradient(#e2e8f0 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: 0 0, 20px 20px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
+    width: 100%;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+  }
+
+  input, textarea, select {
+    font-family: inherit;
+    font-size: 16px; /* prevents zoom on mobile */
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img {
+    max-width: 100%;
+    display: block;
+  }
 }
 
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
-body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg-alt);
-  color: var(--text-primary);
-  line-height: 1.5;
-  min-height: 100vh;
-  width: 100%;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+.custom-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
-#root {
-  min-height: 100vh;
-  width: 100%;
-}
-
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-}
-
-input, textarea, select {
-  font-family: inherit;
-  font-size: 16px; /* prevents zoom on mobile */
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-img {
-  max-width: 100%;
-  display: block;
-}
 
 /* ==============================
    App Shell

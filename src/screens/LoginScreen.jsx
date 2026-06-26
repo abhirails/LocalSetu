@@ -129,87 +129,87 @@ export default function LoginScreen() {
   }
 
   const renderPhoneStep = () => (
-    <>
-      <div className="mb-6 relative z-10">
-        <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-[var(--navy)] mb-1">Verify your number</h2>
-        <p className="text-[var(--text-secondary)] text-[14px]">Get helper recommendations &amp; local updates from neighbors.</p>
+    <div className="relative z-10 space-y-6">
+      <div className="space-y-1">
+        <h3 className="font-headline-md text-[20px] text-[var(--navy)] font-semibold">Verify your number</h3>
+        <p className="font-body-sm text-body-sm text-[var(--text-secondary)]">Get helper recommendations &amp; local updates from neighbors.</p>
       </div>
-      <div className="space-y-4 relative z-10">
-        <div className="space-y-2">
-          <label className="text-label-sm font-label-sm text-[var(--text-muted)] uppercase tracking-wider block">Mobile Number</label>
-          <div className="flex items-center bg-[var(--bg-alt)] border border-[var(--card-border)] rounded-lg overflow-hidden focus-within:border-[var(--primary)] transition-colors duration-200">
-            <div className="px-4 py-3 border-r border-[var(--card-border)] flex items-center gap-1.5 bg-gray-50 shrink-0">
-              <span className="font-bold text-[var(--text-secondary)] text-sm">IN</span>
-              <span className="text-[var(--text-primary)] font-bold text-sm">+91</span>
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="font-label-sm text-label-sm text-[var(--text-muted)] uppercase tracking-wider pl-1">Mobile Number</label>
+          <div className="flex gap-2">
+            <div className="flex items-center justify-center bg-white border border-[var(--card-border)] rounded-xl px-4 font-body-md text-body-md text-[var(--navy)] min-w-[80px] font-semibold">
+              IN +91
             </div>
-            <input 
-              id="login-phone"
-              className="w-full bg-transparent border-none focus:ring-0 px-4 py-3 text-[var(--text-primary)] font-semibold placeholder:text-[var(--text-muted)]/50 outline-none" 
-              maxLength="10" 
-              placeholder="10-digit number" 
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel-national"
-              value={phone}
-              onChange={event => {
-                setPhone(event.target.value.replace(/\D/g, '').slice(0, 10))
-                clearError()
-              }}
-              autoFocus
-            />
+            <div className="flex-1 relative group">
+              <input 
+                id="login-phone"
+                className="w-full bg-white border border-[var(--card-border)] rounded-xl px-4 py-3 font-body-md text-body-md text-[var(--navy)] focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all outline-none placeholder:text-[var(--text-muted)]/50 font-semibold" 
+                maxLength="10" 
+                placeholder="10-digit number" 
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                value={phone}
+                onChange={event => {
+                  setPhone(event.target.value.replace(/\D/g, '').slice(0, 10))
+                  clearError()
+                }}
+                autoFocus
+              />
+            </div>
           </div>
         </div>
 
         {error && (
-          <div className="rounded-lg border border-[var(--error)]/20 bg-[var(--error-light)] px-3.5 py-2.5 text-[13px] text-[var(--error)] font-medium">
+          <div className="rounded-xl border border-[var(--error)]/20 bg-[var(--error-light)] px-3.5 py-2.5 text-xs text-[var(--error)] font-medium">
             ⚠️ {error}
           </div>
         )}
 
         <button 
           className={cx(
-            "w-full py-4 text-white font-headline-lg-mobile text-headline-lg-mobile rounded-lg shadow-md btn-hover-effect transition-all duration-200",
-            canContinueWithPhone && !loading
-              ? "bg-[var(--primary)] hover:bg-[var(--primary-dark)] active:scale-95 cursor-pointer"
-              : "bg-[var(--primary)] opacity-50 grayscale cursor-not-allowed"
+            "w-full text-white font-label-md text-label-md py-4 rounded-xl transition-all active:scale-[0.98] shadow-md shadow-[var(--primary)]/20 cursor-pointer block text-center font-bold",
+            loading
+              ? "bg-[var(--primary)] opacity-50 cursor-not-allowed"
+              : "bg-[var(--primary)] hover:bg-[var(--primary-dark)]"
           )}
           onClick={isSupabaseConfigured ? handleSendOtp : handleLocalOtp}
-          disabled={loading || !canContinueWithPhone}
+          disabled={loading}
           type="submit"
         >
           {loading ? 'Sending OTP…' : 'Get Verification Code'}
         </button>
-
-        {import.meta.env.DEV && (
-          <>
-            <div className="relative my-6 flex items-center justify-center">
-              <div className="w-full border-t border-[var(--card-border)]"></div>
-              <span className="absolute bg-white px-4 text-[var(--text-muted)] text-[12px]">or</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <button 
-                className="flex items-center gap-1.5 text-[var(--primary)] font-semibold hover:underline decoration-2 underline-offset-4 bg-transparent cursor-pointer"
-                onClick={() => {
-                  const user = DEMO_USERS.find(demoUser => demoUser.role === 'resident') || DEMO_USERS[0]
-                  actions.previewLogin(user)
-                  navigate('/home')
-                }}
-              >
-                <span className="material-symbols-outlined text-[18px] text-[var(--marigold)]" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
-                Preview App (Demo)
-              </button>
-            </div>
-          </>
-        )}
       </div>
-    </>
+
+      {import.meta.env.DEV && (
+        <>
+          <div className="flex items-center gap-4 py-2">
+            <div className="h-[1px] flex-1 bg-[var(--card-border)]/40"></div>
+            <span className="font-label-sm text-label-sm text-[var(--text-muted)]">or</span>
+            <div className="h-[1px] flex-1 bg-[var(--card-border)]/40"></div>
+          </div>
+          <button 
+            className="w-full flex items-center justify-center gap-2 text-[var(--primary-dark)] font-label-md text-label-md hover:bg-[var(--primary)]/5 py-2 rounded-lg transition-colors cursor-pointer"
+            onClick={() => {
+              const user = DEMO_USERS.find(demoUser => demoUser.role === 'resident') || DEMO_USERS[0]
+              actions.previewLogin(user)
+              navigate('/home')
+            }}
+          >
+            <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+            Preview App (Demo)
+          </button>
+        </>
+      )}
+    </div>
   )
 
   const renderOtpStep = () => (
-    <>
-      <div className="mb-6 relative z-10">
+    <div className="relative z-10 space-y-6">
+      <div className="space-y-1">
         <button
-          className="mb-3 text-sm font-bold text-[var(--primary)] flex items-center gap-1 hover:underline bg-transparent"
+          className="mb-3 text-xs font-bold text-[var(--primary)] flex items-center gap-1 hover:underline bg-transparent"
           onClick={() => {
             clearError()
             setMode('phone')
@@ -217,22 +217,22 @@ export default function LoginScreen() {
         >
           <span>←</span> Change number
         </button>
-        <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-[var(--navy)] mb-1">Enter Code</h2>
-        <p className="text-[var(--text-secondary)] text-[14px]">We sent a verification code to <strong>+91 {phone}</strong></p>
+        <h3 className="font-headline-md text-[20px] text-[var(--navy)] font-semibold">Enter Code</h3>
+        <p className="font-body-sm text-body-sm text-[var(--text-secondary)]">We sent a verification code to <strong>+91 {phone}</strong></p>
       </div>
 
       {!isSupabaseConfigured && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900 font-medium z-10 relative">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900 font-medium">
           💡 Enter any 6 digits to verify. No real SMS is sent.
         </div>
       )}
 
-      <div className="space-y-4 relative z-10 flex flex-col items-center">
-        <div className="space-y-2 w-full text-center">
-          <label className="text-label-sm font-label-sm text-[var(--text-muted)] uppercase tracking-wider block text-left">Verification Code</label>
+      <div className="space-y-4 flex flex-col items-center">
+        <div className="space-y-1.5 w-full text-center">
+          <label className="font-label-sm text-label-sm text-[var(--text-muted)] uppercase tracking-wider pl-1 text-left block">Verification Code</label>
           <input 
             id="login-otp"
-            className="w-full max-w-[180px] text-center text-2xl font-extrabold tracking-[0.3em] rounded-lg border border-[var(--card-border)] bg-[var(--bg-alt)] px-4 py-3 focus:border-[var(--primary)] focus:bg-white outline-none transition-all duration-200" 
+            className="w-full max-w-[180px] text-center text-2xl font-extrabold tracking-[0.3em] rounded-xl border border-[var(--card-border)] bg-white px-4 py-3 focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] outline-none transition-all duration-200" 
             maxLength="6" 
             placeholder="••••••" 
             type="tel"
@@ -248,39 +248,45 @@ export default function LoginScreen() {
         </div>
 
         {error && (
-          <div className="w-full rounded-lg border border-[var(--error)]/20 bg-[var(--error-light)] px-3.5 py-2.5 text-[13px] text-[var(--error)] font-medium">
+          <div className="w-full rounded-xl border border-[var(--error)]/20 bg-[var(--error-light)] px-3.5 py-2.5 text-xs text-[var(--error)] font-medium">
             ⚠️ {error}
           </div>
         )}
 
         <button 
           className={cx(
-            "w-full py-4 text-white font-headline-lg-mobile text-headline-lg-mobile rounded-lg shadow-md btn-hover-effect transition-all duration-200",
-            otp.length >= 4 && !loading
-              ? "bg-[var(--primary)] hover:bg-[var(--primary-dark)] active:scale-95 cursor-pointer"
-              : "bg-[var(--primary)] opacity-50 grayscale cursor-not-allowed"
+            "w-full text-white font-label-md text-label-md py-4 rounded-xl transition-all active:scale-[0.98] shadow-md shadow-[var(--primary)]/20 cursor-pointer block text-center font-bold",
+            loading
+              ? "bg-[var(--primary)] opacity-50 cursor-not-allowed"
+              : "bg-[var(--primary)] hover:bg-[var(--primary-dark)]"
           )}
-          onClick={isSupabaseConfigured ? handleVerifyOtp : () => setMode('signup')}
-          disabled={loading || otp.length < 4}
+          onClick={isSupabaseConfigured ? handleVerifyOtp : () => {
+            if (otp.length < 4) {
+              setError('Enter the OTP you received.')
+              return
+            }
+            setMode('signup')
+          }}
+          disabled={loading}
         >
           {loading ? 'Verifying…' : 'Verify & Continue'}
         </button>
       </div>
-    </>
+    </div>
   )
 
   const renderSignupStep = () => (
-    <>
-      <div className="mb-6 relative z-10">
-        <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-[var(--navy)] mb-1">Create Profile</h2>
-        <p className="text-[var(--text-secondary)] text-[14px]">Let neighbors know what to call you.</p>
+    <div className="relative z-10 space-y-6">
+      <div className="space-y-1">
+        <h3 className="font-headline-md text-[20px] text-[var(--navy)] font-semibold">Create Profile</h3>
+        <p className="font-body-sm text-body-sm text-[var(--text-secondary)]">Let neighbors know what to call you.</p>
       </div>
-      <div className="space-y-4 relative z-10">
-        <div className="space-y-2">
-          <label className="text-label-sm font-label-sm text-[var(--text-muted)] uppercase tracking-wider block">Your Name</label>
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="font-label-sm text-label-sm text-[var(--text-muted)] uppercase tracking-wider pl-1">Your Name</label>
           <input 
             id="login-name"
-            className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--bg-alt)] px-4 py-3 focus:border-[var(--primary)] focus:bg-white outline-none font-semibold text-lg text-[var(--text-primary)] transition-all duration-200" 
+            className="w-full bg-white border border-[var(--card-border)] rounded-xl px-4 py-3 font-body-md text-body-md text-[var(--navy)] focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] outline-none transition-all duration-200 font-semibold" 
             placeholder="First name is enough" 
             type="text"
             autoComplete="name"
@@ -290,115 +296,119 @@ export default function LoginScreen() {
           />
         </div>
 
-        <div className="flex items-start gap-2 bg-[var(--primary)]/5 p-3 rounded-lg border border-[var(--primary)]/10 text-xs text-[var(--text-secondary)] leading-relaxed">
+        <div className="flex items-start gap-2 bg-[var(--primary)]/5 p-3 rounded-xl border border-[var(--primary)]/10 text-xs text-[var(--text-secondary)] leading-relaxed">
           <span>📍</span>
           <span>We'll detect your locality automatically after joining. You can modify it anytime in your profile.</span>
         </div>
 
         {error && (
-          <div className="rounded-lg border border-[var(--error)]/20 bg-[var(--error-light)] px-3.5 py-2.5 text-[13px] text-[var(--error)] font-medium">
+          <div className="rounded-xl border border-[var(--error)]/20 bg-[var(--error-light)] px-3.5 py-2.5 text-xs text-[var(--error)] font-medium">
             ⚠️ {error}
           </div>
         )}
 
         <button 
           className={cx(
-            "w-full py-4 text-white font-headline-lg-mobile text-headline-lg-mobile rounded-lg shadow-md btn-hover-effect transition-all duration-200",
-            canCompleteProfile && !loading
-              ? "bg-[var(--primary)] hover:bg-[var(--primary-dark)] active:scale-95 cursor-pointer"
-              : "bg-[var(--primary)] opacity-50 grayscale cursor-not-allowed"
+            "w-full text-white font-label-md text-label-md py-4 rounded-xl transition-all active:scale-[0.98] shadow-md shadow-[var(--primary)]/20 cursor-pointer block text-center font-bold",
+            loading
+              ? "bg-[var(--primary)] opacity-50 cursor-not-allowed"
+              : "bg-[var(--primary)] hover:bg-[var(--primary-dark)]"
           )}
-          onClick={isSupabaseConfigured ? handleCompleteSignup : handleLocalSignup}
-          disabled={loading || !canCompleteProfile}
+          onClick={isSupabaseConfigured ? handleCompleteSignup : () => {
+            if (!name.trim()) {
+              setError('Please enter your name.')
+              return
+            }
+            handleLocalSignup()
+          }}
+          disabled={loading}
         >
           {loading ? 'Joining…' : 'Join LocalSetu'}
         </button>
       </div>
-    </>
+    </div>
   )
 
   return (
-    <div className="flex min-h-screen w-full justify-center bg-[var(--bg)] jaali-pattern py-8 px-4 sm:items-center sm:py-16">
-      <main className="w-full max-w-[600px] min-h-screen sm:min-h-0 bg-white/95 backdrop-blur-sm flex flex-col px-6 py-10 sm:p-10 rounded-2xl shadow-xl border border-[var(--card-border)]/55 relative overflow-hidden">
-        {/* Soft background glows */}
-        <div className="absolute -right-24 -top-24 w-80 h-80 rounded-full bg-[var(--primary)]/5 blur-[96px] pointer-events-none" />
-        <div className="absolute -left-24 bottom-1/4 w-80 h-80 rounded-full bg-[var(--marigold)]/5 blur-[80px] pointer-events-none" />
-
-        {/* Header / Logo Section */}
-        <header className="flex flex-col items-center pt-4 mb-8">
-          {/* Logo Mark & Name */}
-          <div className="flex items-center gap-2.5 mb-8">
-            <div className="w-10 h-10 bg-[var(--primary)] rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
-              <div className="absolute inset-0 bg-[var(--saffron)]/10 opacity-50"></div>
-              <span className="material-symbols-outlined text-white relative z-10 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>home_pin</span>
-            </div>
-            <span className="font-headline-lg-mobile text-headline-lg-mobile font-extrabold tracking-tight text-[var(--navy)]">
-              Local<span className="text-[var(--primary)]">Setu</span>
-            </span>
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8">
+      <main className="w-full max-w-[480px] flex flex-col items-center">
+        {/* Logo Header */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 bg-[var(--primary)] rounded-xl flex items-center justify-center mb-3 shadow-lg">
+            <span className="material-symbols-outlined text-white text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
           </div>
+          <h1 className="font-headline-md text-headline-md text-[var(--navy)] flex items-center gap-1">
+            Local<span className="text-[var(--primary)] font-bold">Setu</span>
+          </h1>
+        </div>
 
-          {/* Tagline Headline */}
-          <div className="text-center sm:text-left w-full space-y-4">
-            <h1 className="font-headline-xl text-headline-xl text-[var(--navy)] leading-tight text-center sm:text-left">
-              You've connected to the world.<br />
-              <span className="text-[var(--primary)]">Now, connect with your local community.</span>
-            </h1>
-            <p className="text-[var(--text-secondary)] font-body-md leading-relaxed text-center sm:text-left">
+        {/* Main Content Card */}
+        <div className="glass-card w-full rounded-[32px] p-6 md:p-10 custom-shadow flex flex-col space-y-8">
+          {/* Hero Text */}
+          <section className="space-y-4">
+            <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-[var(--navy)] leading-tight">
+              You've connected to the world. <br />
+              <span className="text-[var(--primary)] font-bold">Now, connect with your local community.</span>
+            </h2>
+            <p className="font-body-md text-body-md text-[var(--text-secondary)]">
               Connect with verified neighbors for real help, live safety updates, and recommendations in your area.
             </p>
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--primary-light)] rounded-full border border-[var(--card-border)]/30 text-[var(--primary)] font-label-md text-label-md font-bold">
+                <span className="material-symbols-outlined text-sm">sensors</span>
+                Live updates
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--saffron)]/10 rounded-full border border-[var(--saffron)]/30 text-[var(--marigold)] font-label-md text-label-md font-bold">
+                <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                Verified help
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--primary-light)] rounded-full border border-[var(--primary-dark)]/30 text-[var(--primary-dark)] font-label-md text-label-md font-bold">
+                <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                Need it now
+              </span>
+            </div>
+          </section>
+
+          {/* Authentication Form Card */}
+          <section className="bg-[var(--bg-alt)] rounded-2xl p-6 border border-[var(--card-border)]/20 relative overflow-hidden w-full">
+            <div className="absolute -top-4 -right-4 w-24 h-24 bg-[var(--primary)]/5 rounded-full blur-2xl pointer-events-none"></div>
+            
+            {mode === 'phone' && renderPhoneStep()}
+            {mode === 'otp' && renderOtpStep()}
+            {mode === 'signup' && renderSignupStep()}
+          </section>
+
+          {/* Community Illustration (Device Mockup Frame) */}
+          <div className="w-full rounded-[24px] border-[10px] border-[#a7b5a8] bg-[#f8fafc] shadow-lg relative aspect-[16/9] overflow-hidden group">
+            {/* Notch/Speaker slot on the left bezel */}
+            <div className="absolute left-[-7px] top-1/2 -translate-y-1/2 w-1.5 h-8 bg-black/25 rounded-full z-20"></div>
+            
+            <video 
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+              src="/people.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none"></div>
           </div>
-        </header>
 
-        {/* Status Pills */}
-        <section className="flex flex-wrap gap-2.5 mb-8 justify-center sm:justify-start">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--primary)]/10 border border-[var(--primary)]/20">
-            <span className="material-symbols-outlined text-[16px] text-[var(--primary)]" style={{ fontVariationSettings: "'FILL' 1" }}>sensors</span>
-            <span className="text-label-sm font-label-sm text-[var(--primary)]">Live updates</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--saffron)]/10 border border-[var(--saffron)]/30">
-            <span className="material-symbols-outlined text-[16px] text-[var(--saffron)]" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-            <span className="text-label-sm font-label-sm text-[var(--navy)]">Verified help</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--marigold)]/10 border border-[var(--marigold)]/30">
-            <span className="material-symbols-outlined text-[16px] text-[var(--marigold)]" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
-            <span className="text-label-sm font-label-sm text-[var(--navy)]">Need it now</span>
-          </div>
-        </section>
-
-        {/* Decorative Divider */}
-        <div className="flex items-center justify-center mb-8 opacity-25">
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent"></div>
-          <span className="material-symbols-outlined text-[var(--primary)] px-4">flare</span>
-          <div className="h-px w-full bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-transparent"></div>
-        </div>
-
-        {/* Login Card */}
-        <section className="bg-white border border-[var(--card-border)] rounded-xl p-6 shadow-sm relative overflow-hidden w-full max-w-[320px] mx-auto mb-8">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[var(--marigold)]/5 rounded-full -mr-12 -mt-12 pointer-events-none"></div>
-          
-          {mode === 'phone' && renderPhoneStep()}
-          {mode === 'otp' && renderOtpStep()}
-          {mode === 'signup' && renderSignupStep()}
-        </section>
-
-        {/* Visual Anchor / Image */}
-        <div className="mt-2 mb-8 rounded-xl overflow-hidden aspect-video relative shadow-inner w-full max-w-[320px] mx-auto">
-          <img 
-            alt="Vibrant Indian neighborhood street" 
-            className="w-full h-full object-cover" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8aHI3L4UjSpjrMS3rI3t_lbTdLMwa_7EHY67zJJAV-biD_GhVwYapstpqbgLSR7BefnTTKtOez0hk4FymXPmZzMsbgKXHgkIDC-U6ISspxuqlLgykXBg36orMRPbz-HvLnMMPDSO9Cmwg_gdEVaJ1oAdunaJMBPfm0RrcVXybl1sCJSVWtlIDUUiUCN3zAICh-GAHBeOZS2V72ypnNlgSMnzWhaRuMFseW-Hxwrsgk7RDlijIV9NCxFC2kjhq6Te-Oke9cF8wJ1JP"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)]/90 via-transparent to-transparent"></div>
-        </div>
-
-        {/* Footer Notice */}
-        <footer className="mt-auto pt-6 text-center flex flex-col items-center border-t border-[var(--border-light)]">
-          <div className="max-w-[90%] flex items-start gap-2.5 bg-[var(--primary)]/5 p-4 rounded-xl border border-[var(--primary)]/10">
-            <span className="material-symbols-outlined text-[var(--marigold)] text-lg mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
-            <p className="text-[12px] text-left text-[var(--text-secondary)] leading-normal">
+          {/* Trust Footer */}
+          <div className="bg-[var(--primary-light)] rounded-xl p-4 flex gap-3 items-start border border-[var(--card-border)]/10">
+            <span className="material-symbols-outlined text-[var(--marigold)] pt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+            <p className="font-body-sm text-body-sm text-[var(--text-secondary)] leading-relaxed">
               Your mobile number is only used for secure login. It is never displayed publicly or shared with anyone in your area.
             </p>
           </div>
+        </div>
+
+        {/* System Status/Help */}
+        <footer className="mt-8 flex justify-center gap-8 font-label-sm text-label-sm text-[var(--text-muted)]">
+          <a className="hover:text-[var(--primary)] transition-colors" href="#privacy">Privacy Policy</a>
+          <a className="hover:text-[var(--primary)] transition-colors" href="#terms">Terms of Service</a>
+          <a className="hover:text-[var(--primary)] transition-colors" href="#support">Contact Support</a>
         </footer>
       </main>
     </div>

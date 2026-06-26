@@ -14,7 +14,7 @@ export default defineConfig({
         name:             'LocalSetu — Your Neighbourhood App',
         short_name:       'LocalSetu',
         description:      'Real-time updates, verified helpers, and urgent needs from people near you.',
-        theme_color:      '#00685e',
+        theme_color:      '#005c55',
         background_color: '#FFFFFF',
         display:          'standalone',
         orientation:      'portrait',

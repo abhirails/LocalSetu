@@ -9,7 +9,7 @@ const inputBase = 'w-full rounded-[var(--radius-sm)] border-[1.5px] border-[var(
 const buttonBase = `inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-sm)] px-6 py-3 text-[15px] font-bold shadow-[0_2px_4px_rgba(25,20,10,0.02)] transition-all duration-200 ${ease} active:scale-[0.97]`
 
 export const ui = {
-  appShell: 'flex min-h-dvh w-full justify-center bg-[var(--bg-alt)]',
+  appShell: 'flex min-h-dvh w-full justify-center bg-transparent',
   appContainer: 'relative mx-auto flex min-h-dvh w-full max-w-[var(--max-width)] flex-col bg-[var(--bg)] shadow-[0_0_0_1px_rgba(25,20,10,0.03)]',
   screen: 'flex-1 overflow-y-auto pb-[var(--bottom-nav-height)]',
 
