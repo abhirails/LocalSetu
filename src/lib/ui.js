@@ -5,7 +5,7 @@ export function cx(...classes) {
 const ease = 'ease-[cubic-bezier(0.4,0,0.2,1)]'
 const cardBase = `bg-[var(--card)] rounded-[var(--radius)] p-4 shadow-[var(--card-shadow)] border border-[var(--card-border)] transition-all duration-200 ${ease} hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(25,20,10,0.05)]`
 const pillBase = 'inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full transition-all duration-150'
-const inputBase = 'w-full rounded-[var(--radius-sm)] border-[1.5px] border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[15px] text-[var(--text-primary)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(255,92,38,0.12)]'
+const inputBase = 'w-full rounded-[var(--radius-sm)] border-[1.5px] border-[var(--border)] bg-[var(--card)] px-4 py-3 text-[15px] text-[var(--text-primary)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_rgba(13,148,136,0.12)]'
 const buttonBase = `inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-sm)] px-6 py-3 text-[15px] font-bold shadow-[0_2px_4px_rgba(25,20,10,0.02)] transition-all duration-200 ${ease} active:scale-[0.97]`
 
 export const ui = {
@@ -15,7 +15,7 @@ export const ui = {
 
   header: 'sticky top-0 z-[100] flex h-[var(--header-height)] items-center justify-between gap-3 border-b border-[var(--border-light)] bg-white/90 px-4 shadow-[0_1px_3px_rgba(25,20,10,0.02)] backdrop-blur-md',
   headerDark: 'bg-[var(--navy)]',
-  headerLogo: 'inline-block bg-gradient-to-br from-[var(--primary)] to-[#FF8A50] bg-clip-text text-[21px] font-extrabold tracking-[-0.6px] text-transparent',
+  headerLogo: 'inline-block bg-gradient-to-br from-[var(--primary)] to-[#14B8A6] bg-clip-text text-[21px] font-extrabold tracking-[-0.6px] text-transparent',
   headerLogoAccent: 'bg-gradient-to-br from-[var(--navy)] to-[var(--navy-light)] bg-clip-text text-transparent',
   headerLocality: 'flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)]',
   headerActions: 'flex shrink-0 items-center gap-1.5',
@@ -26,7 +26,7 @@ export const ui = {
   navItemActive: 'text-[var(--primary)]',
   navItemIcon: 'text-[21px] leading-none transition-transform duration-200',
   navItemIconActive: 'scale-110',
-  navItemPost: `mt-[-12px] flex h-[52px] w-[52px] flex-none flex-col items-center justify-center gap-0 rounded-[18px] bg-gradient-to-br from-[var(--primary)] to-[#FF8533] text-2xl text-white shadow-[0_6px_16px_rgba(255,92,38,0.35)] transition-all duration-200 ${ease} hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_8px_20px_rgba(255,92,38,0.45)] active:translate-y-0 active:scale-95`,
+  navItemPost: `mt-[-12px] flex h-[52px] w-[52px] flex-none flex-col items-center justify-center gap-0 rounded-[18px] bg-gradient-to-br from-[var(--primary)] to-[#2DD4BF] text-2xl text-white shadow-[0_6px_16px_rgba(13,148,136,0.35)] transition-all duration-200 ${ease} hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_8px_20px_rgba(13,148,136,0.45)] active:translate-y-0 active:scale-95`,
   navItemPostIcon: 'block text-[30px] font-normal leading-none text-white',
 
   tabBar: 'flex gap-2 overflow-x-auto border-b border-[var(--border-light)] bg-[var(--card)] px-3.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
@@ -92,8 +92,9 @@ export const ui = {
 
   btn: buttonBase,
   btnAuto: cx(buttonBase, 'w-auto'),
-  btnPrimary: 'bg-gradient-to-br from-[var(--primary)] to-[#FF7E47] text-white hover:from-[var(--primary-dark)] hover:to-[var(--primary)] hover:shadow-[0_4px_12px_rgba(255,92,38,0.2)]',
+  btnPrimary: 'bg-gradient-to-br from-[var(--primary)] to-[#2DD4BF] text-white hover:from-[var(--primary-dark)] hover:to-[var(--primary)] hover:shadow-[0_4px_12px_rgba(13,148,136,0.2)]',
   btnSecondary: 'border-[1.5px] border-[var(--border)] bg-[var(--card)] text-[var(--text-primary)] hover:border-[var(--text-secondary)] hover:bg-[var(--bg-alt)]',
+  btnDisabled: 'cursor-not-allowed border-0 bg-[#ECEAE4] text-[var(--text-muted)] shadow-none hover:shadow-none active:scale-100',
   btnDanger: 'border-[1.5px] border-[var(--error)] bg-[var(--error-light)] text-[var(--error)] hover:bg-[var(--error)] hover:text-white',
   btnSm: 'px-4 py-2 text-[13px]',
 
@@ -117,19 +118,50 @@ export const ui = {
   sectionTitle: 'text-sm font-extrabold uppercase tracking-[0.4px] text-[var(--text-primary)]',
   sectionLink: 'text-[13px] font-semibold text-[var(--primary)]',
 
-  loginScreen: 'flex min-h-screen flex-col bg-[var(--card)]',
-  loginHero: 'shrink-0 bg-gradient-to-br from-[var(--primary)] to-[#FF8A50] px-7 pb-8 pt-10 text-white',
-  loginLogo: 'mb-2 inline-block text-[34px] font-extrabold tracking-[-0.8px] text-white',
-  loginLogoAccent: 'text-white/80',
-  loginTagline: 'text-base leading-snug text-white/80',
-  loginFormArea: 'flex flex-1 flex-col gap-4 px-6 py-7',
-  loginTitle: 'text-[22px] font-extrabold text-[var(--text-primary)]',
-  loginSub: 'mt-[-8px] text-sm text-[var(--text-secondary)]',
+  // ── Login Screen ──────────────────────────────────────────
+  loginShell: 'flex min-h-dvh w-full justify-center bg-[#F7F5F0] sm:items-center sm:p-6',
+  loginContainer: 'relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-white sm:min-h-0 sm:rounded-[32px] sm:shadow-[0_24px_64px_rgba(25,20,10,0.12)] sm:ring-1 sm:ring-black/[0.04]',
+
+  // Hero banner
+  loginHero: 'relative flex shrink-0 flex-col overflow-hidden bg-gradient-to-br from-[#FF5C26] via-[#FF7540] to-[#FFA06E] px-7 pb-12 pt-12 text-white sm:px-8 sm:pt-16',
+  loginHeroGlow: 'pointer-events-none absolute right-[-40px] top-[-40px] h-64 w-64 rounded-full bg-white/15 blur-[64px]',
+  loginHeroGlowSecondary: 'pointer-events-none absolute bottom-[-30px] left-[-30px] h-56 w-56 rounded-full bg-[#FFE699]/20 blur-[48px]',
+  loginHeroWave: 'pointer-events-none absolute inset-x-0 bottom-0 h-[32px] w-full',
+
+  // Logo
+  loginLogo: 'relative z-[1] text-[34px] font-black tracking-[-1.2px] text-white drop-shadow-sm flex items-center gap-2',
+  loginLogoAccent: 'text-white/70',
+
+  // Tagline
+  loginTagline: 'relative z-[1] mt-4 max-w-[280px] text-[22px] font-extrabold leading-[1.3] text-white drop-shadow-sm',
+  loginHeroDesc: 'relative z-[1] mt-2 max-w-[310px] text-[13.5px] leading-relaxed text-white/80',
+
+  // Floating pills
+  loginHeroPills: 'relative z-[1] mt-5 flex flex-wrap gap-2.5',
+  loginHeroPill: 'rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold text-white tracking-wide ring-1 ring-white/10 backdrop-blur-md',
+  loginHeroBadge: 'relative z-[1] mt-5 inline-flex items-center gap-1.5 text-[11px] font-medium text-white/50',
+
+  // Form card — floats above hero with big rounded top corners
+  loginFormCard: 'relative z-10 -mt-6 flex flex-1 flex-col gap-6 rounded-t-[32px] bg-white px-7 pb-12 pt-8 shadow-[0_-8px_32px_rgba(25,20,10,0.06)] sm:px-8',
+
+  // Form text
+  loginTitle: 'text-[22px] font-extrabold tracking-[-0.5px] text-[var(--text-primary)]',
+  loginSub: 'mt-1 text-[13.5px] leading-relaxed text-[var(--text-secondary)]',
+
+  // Phone input — large, tactile, flag-prefixed
+  loginPhoneWrap: 'flex items-stretch overflow-hidden rounded-[16px] border-2 border-[var(--border)] bg-[var(--bg-alt)] transition-all duration-200 focus-within:border-[var(--primary)] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,80,32,0.10)]',
+  loginPhonePrefix: 'flex shrink-0 items-center gap-2 border-r-2 border-[var(--border)] bg-white/70 px-4 py-4 text-[15px] font-extrabold text-[var(--text-primary)]',
+  loginPhoneInput: 'min-w-0 flex-1 border-0 bg-transparent px-4 py-4 text-[18px] font-semibold tracking-[0.05em] text-[var(--text-primary)] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-muted)]',
+
+  // Trust message
+  loginTrust: 'flex items-center gap-2.5 rounded-[14px] border border-[var(--border-light)] bg-[var(--bg)] px-4 py-3 text-[12px] leading-relaxed text-[var(--text-muted)]',
+  loginTrustIcon: 'shrink-0 text-base leading-none',
+
   loginToggle: 'p-2 text-center text-sm text-[var(--text-secondary)]',
   loginToggleButton: 'text-sm font-bold text-[var(--primary)]',
   divider: "my-1 flex items-center gap-3 text-xs text-[var(--text-muted)] before:h-px before:flex-1 before:bg-[var(--border)] before:content-[''] after:h-px after:flex-1 after:bg-[var(--border)] after:content-['']",
   demoLoginOptions: 'flex flex-col gap-2.5',
-  demoUserBtn: `flex w-full items-center gap-3.5 rounded-[var(--radius-sm)] border-[1.5px] border-[var(--border)] bg-[var(--card)] px-[18px] py-3.5 text-left shadow-[0_2px_8px_rgba(25,20,10,0.02)] transition-all duration-200 ${ease} hover:border-[var(--primary)] hover:bg-[var(--primary-light)] hover:shadow-[0_4px_12px_rgba(255,92,38,0.08)] active:scale-[0.98]`,
+  demoUserBtn: `flex w-full items-center gap-3.5 rounded-[var(--radius-sm)] border-[1.5px] border-[var(--border)] bg-[var(--card)] px-[18px] py-3.5 text-left shadow-[0_2px_8px_rgba(25,20,10,0.02)] transition-all duration-200 ${ease} hover:border-[var(--primary)] hover:bg-[var(--primary-light)] hover:shadow-[0_4px_12px_rgba(0,104,94,0.08)] active:scale-[0.98]`,
   demoUserBtnCompact: 'px-3.5 py-3',
   demoUserAvatar: 'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-light)] text-base font-extrabold text-[var(--primary)]',
   demoUserInfo: 'flex-1',
@@ -137,8 +169,8 @@ export const ui = {
   demoUserRole: 'mt-px text-xs text-[var(--text-secondary)]',
 
   categoryGrid: 'grid grid-cols-4 gap-2 px-3.5 py-3',
-  categoryItem: `flex cursor-pointer flex-col items-center gap-2 rounded-[var(--radius-sm)] border-[1.5px] border-[var(--border)] bg-[var(--card)] px-2 py-3 transition-all duration-200 ${ease} hover:border-[var(--primary)] hover:bg-[var(--primary-light)] hover:shadow-[0_4px_12px_rgba(255,92,38,0.08)] active:scale-95`,
-  categoryItemSelected: 'border-[var(--primary)] bg-[var(--primary-light)] shadow-[0_4px_12px_rgba(255,92,38,0.08)]',
+  categoryItem: `flex cursor-pointer flex-col items-center gap-2 rounded-[var(--radius-sm)] border-[1.5px] border-[var(--border)] bg-[var(--card)] px-2 py-3 transition-all duration-200 ${ease} hover:border-[var(--primary)] hover:bg-[var(--primary-light)] hover:shadow-[0_4px_12px_rgba(0,104,94,0.08)] active:scale-95`,
+  categoryItemSelected: 'border-[var(--primary)] bg-[var(--primary-light)] shadow-[0_4px_12px_rgba(0,104,94,0.08)]',
   categoryIcon: 'text-2xl leading-none transition-transform duration-200',
   categoryIconSelected: 'scale-[1.15]',
   categoryLabel: 'text-center text-[11px] font-bold leading-[1.2] text-[var(--text-secondary)]',
@@ -180,7 +212,7 @@ export const ui = {
   adminActionBan: 'border-[var(--navy)] bg-[var(--navy)] text-white',
 
   profileHero: 'relative flex flex-col items-center gap-2.5 bg-gradient-to-br from-[var(--navy)] via-[#1E2D5A] to-[#2D3A6B] px-5 pb-6 pt-7 text-white',
-  profileAvatarLg: 'flex h-[72px] w-[72px] items-center justify-center rounded-[22px] border-[3px] border-white/25 bg-gradient-to-br from-[var(--primary)] to-[#FF8533] text-[28px] font-extrabold text-white shadow-[0_4px_14px_rgba(255,92,38,0.3)]',
+  profileAvatarLg: 'flex h-[72px] w-[72px] items-center justify-center rounded-[22px] border-[3px] border-white/25 bg-gradient-to-br from-[var(--primary)] to-[#14B8A6] text-[28px] font-extrabold text-white shadow-[0_4px_14px_rgba(13,148,136,0.3)]',
   profileName: 'text-xl font-extrabold',
   profileLocalityTag: 'flex items-center gap-1 text-[13px] text-white/70',
   profileStatsRow: 'mt-1 flex gap-6',
@@ -214,7 +246,7 @@ export const ui = {
 
   spinner: 'mx-auto h-6 w-6 animate-spin rounded-full border-[3px] border-[var(--border)] border-t-[var(--primary)]',
   localityScreen: 'flex min-h-screen flex-col bg-[var(--card)]',
-  localityHero: 'bg-gradient-to-br from-[var(--primary)] to-[#FF8C5A] px-7 pb-8 pt-12 text-white',
+  localityHero: 'bg-gradient-to-br from-[var(--primary)] to-[#14B8A6] px-7 pb-8 pt-12 text-white',
   localityHeroTitle: 'mb-2 text-[26px] font-black',
   localityHeroDescription: 'text-sm leading-normal text-white/85',
   localityList: 'flex flex-1 flex-col gap-2 overflow-y-auto p-4',

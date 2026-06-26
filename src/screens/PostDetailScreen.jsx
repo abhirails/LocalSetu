@@ -72,7 +72,8 @@ export default function PostDetailScreen() {
   const selectedQuote = post ? helpers.getSelectedQuote(post.id) : null
   const isMyPost = state.currentUser?.id === post?.userId
   const isAdmin = state.currentUser?.role === 'admin'
-  const canSubmitQuote = isLoggedIn && post?.category === 'need_to_buy' && !post?.isBought && !quotes.find(q => q.submittedBy === state.currentUser?.id)
+  const isShopOwner = state.currentUser?.role === 'shop_owner'
+  const canSubmitQuote = isLoggedIn && isShopOwner && post?.category === 'need_to_buy' && !post?.isBought && !quotes.find(q => q.shopOwnerId === state.currentUser?.id)
 
   const submitQuote = () => {
     if (!qShopName.trim() || !qPrice) return

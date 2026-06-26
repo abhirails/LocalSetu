@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { normalizePost, normalizeReply, normalizeSocietyPost } from '../lib/db'
+import { normalizePost, normalizeReply, normalizeSocietyPost, normalizeQuote } from '../lib/db'
 
 export function useRealtime(dispatch, currentUser) {
   const channelRef = useRef(null)
@@ -70,6 +70,47 @@ export function useRealtime(dispatch, currentUser) {
         const post = normalizeSocietyPost(payload.new)
         if (!post) return
         dispatch({ type: 'REALTIME_NEW_SOCIETY_POST', post })
+      })
+
+      .on('postgres_changes', {
+        event:  '*',
+        schema: 'public',
+        table:  'quotes',
+      }, (payload) => {
+        const eventType = payload.eventType;
+
+        if (eventType === 'INSERT') {
+          dispatch({
+            type: 'ADD_QUOTE',
+            payload: normalizeQuote(payload.new),
+          });
+          return;
+        }
+
+        if (eventType === 'UPDATE') {
+          const quote = normalizeQuote(payload.new);
+
+          if (['withdrawn', 'removed', 'rejected', 'deleted'].includes(quote.status)) {
+            dispatch({
+              type: 'REMOVE_QUOTE',
+              payload: quote.id,
+            });
+          } else {
+            dispatch({
+              type: 'UPDATE_QUOTE',
+              payload: quote,
+            });
+          }
+
+          return;
+        }
+
+        if (eventType === 'DELETE') {
+          dispatch({
+            type: 'REMOVE_QUOTE',
+            payload: payload.old?.id,
+          });
+        }
       })
 
       .subscribe((status) => {

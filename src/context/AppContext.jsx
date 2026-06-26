@@ -321,16 +321,37 @@ function reducer(state, action) {
       }
 
     // ── Phase 6.6: Quotes ──
-    case 'ADD_QUOTE':
-      return { ...state, quotes: [action.quote, ...state.quotes] }
-
-    case 'REMOVE_QUOTE':
+    case 'SET_QUOTES':
       return {
         ...state,
-        quotes: state.quotes.map(q =>
-          q.id === action.quoteId ? { ...q, isRemoved: true } : q
-        )
+        quotes: action.payload || action.quotes || [],
       }
+
+    case 'ADD_QUOTE': {
+      const q = action.payload || action.quote;
+      return {
+        ...state,
+        quotes: [q, ...(state.quotes || [])],
+      }
+    }
+
+    case 'UPDATE_QUOTE': {
+      const q = action.payload || action.quote;
+      return {
+        ...state,
+        quotes: (state.quotes || []).map(quote =>
+          quote.id === q.id ? q : quote
+        ),
+      }
+    }
+
+    case 'REMOVE_QUOTE': {
+      const id = action.payload || action.quoteId;
+      return {
+        ...state,
+        quotes: (state.quotes || []).filter(quote => quote.id !== id),
+      }
+    }
 
     case 'SELECT_QUOTE':
       return {
@@ -476,7 +497,7 @@ export function AppProvider({ children }) {
 
     const loadData = async (userId) => {
       try {
-        const [profile, posts, providers, savedIds, reports, societies, feedSocietyPosts, memberships] = await Promise.all([
+        const [profile, posts, providers, savedIds, reports, societies, feedSocietyPosts, memberships, quotes, businesses] = await Promise.all([
           db.getProfile(userId),
           db.getPosts(),
           db.getProviders(),
@@ -484,7 +505,9 @@ export function AppProvider({ children }) {
           db.getReports().catch(() => []),
           db.getSocieties().catch(() => []),
           db.getFeedSocietyPosts().catch(() => []),
-          db.getUserMemberships(userId).catch(() => [])
+          db.getUserMemberships(userId).catch(() => []),
+          db.getQuotes().catch(() => []),
+          db.getBusinesses().catch(() => [])
         ])
         dispatch({ type: 'SET_USER', user: { ...profile, savedPosts: savedIds } })
         dispatch({ type: 'SET_POSTS', posts })
@@ -492,6 +515,8 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_SAVED', ids: savedIds })
         dispatch({ type: 'SET_REPORTS', reports })
         dispatch({ type: 'SET_SOCIETIES', societies })
+        dispatch({ type: 'SET_QUOTES', payload: quotes, quotes })
+        dispatch({ type: 'SET_BUSINESSES', payload: businesses, businesses })
         feedSocietyPosts.forEach(p => dispatch({ type: 'ADD_SOCIETY_POST', post: p }))
         dispatch({ type: 'SET_SOCIETY_MEMBERS', members: memberships })
         // Restore saved localities from profile

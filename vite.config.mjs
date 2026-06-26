@@ -5,8 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
-    tailwindcss(),
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-192.png', 'pwa-512.png', 'apple-touch-icon.png'],
@@ -14,7 +14,7 @@ export default defineConfig({
         name:             'LocalSetu — Your Neighbourhood App',
         short_name:       'LocalSetu',
         description:      'Real-time updates, verified helpers, and urgent needs from people near you.',
-        theme_color:      '#FF6B35',
+        theme_color:      '#00685e',
         background_color: '#FFFFFF',
         display:          'standalone',
         orientation:      'portrait',

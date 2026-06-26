@@ -926,58 +926,178 @@ export async function updateCivicStatus(postId, civicStatus) {
 // Phase 6.6 — Quotes (Need to Buy)
 // ============================================================
 
-export function normalizeQuote(q) {
+export function normalizeQuote(q = {}) {
+  const shopOwnerId =
+    q.shop_owner_id ??
+    q.shopOwnerId ??
+    q.submitted_by ??
+    q.submittedBy ??
+    null;
+
+  const quotedPricePaise =
+    q.quoted_price_paise ??
+    q.quotedPricePaise ??
+    (q.price != null ? Math.round(Number(q.price) * 100) : null);
+
+  const deliveryFeePaise =
+    q.delivery_fee_paise ??
+    q.deliveryFeePaise ??
+    q.delivery_charge_paise ??
+    (q.deliveryCharge != null ? Math.round(Number(q.deliveryCharge) * 100) : 0);
+
+  const business = q.businesses || q.business || {};
+  const status = q.status ?? 'pending';
+  const isRemoved = ['withdrawn', 'removed', 'rejected', 'deleted'].includes(status) || q.is_removed === true;
+
   return {
-    id:                q.id,
-    postId:            q.post_id,
-    submittedBy:       q.submitted_by,
-    shopName:          q.shop_name,
-    shopCategory:      q.shop_category ?? null,
-    price:             q.price,
-    deliveryTime:      q.delivery_time ?? null,
-    deliveryCharge:    q.delivery_charge ?? 0,
-    pickupAvailable:   q.pickup_available ?? false,
-    deliveryAvailable: q.delivery_available ?? true,
-    paymentMode:       q.payment_mode ?? 'both',
-    message:           q.message ?? '',
-    isAvailable:       q.is_available ?? 'yes',
-    isRemoved:         q.is_removed ?? false,
-    createdAt:         q.created_at,
+    id: q.id,
+    postId: q.post_id ?? q.postId,
+    businessId: q.business_id ?? q.businessId ?? business.id ?? null,
+
+    shopOwnerId,
+    submittedBy: shopOwnerId,
+
+    quotedPricePaise,
+    price: quotedPricePaise != null ? quotedPricePaise / 100 : Number(q.price ?? 0),
+
+    deliveryFeePaise,
+    deliveryCharge: deliveryFeePaise != null ? deliveryFeePaise / 100 : Number(q.deliveryCharge ?? 0),
+
+    deliveryTime:
+      q.estimated_minutes ??
+      q.deliveryTime ??
+      q.delivery_time ??
+      null,
+
+    shopName:
+      business.name ??
+      q.shopName ??
+      q.shop_name ??
+      'Local shop',
+
+    shopCategory:
+      business.category ??
+      q.shopCategory ??
+      q.shop_category ??
+      null,
+
+    status,
+    isRemoved,
+    note: q.note ?? q.message ?? '',
+    createdAt: q.created_at ?? q.createdAt,
+    updatedAt: q.updated_at ?? q.updatedAt,
+  };
+}
+
+export async function getQuotes() {
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from('quotes')
+    .select(`
+      *,
+      businesses:business_id (
+        id,
+        name,
+        category,
+        city,
+        locality
+      )
+    `)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getQuotes error:', error);
+    return [];
   }
+
+  return (data || []).map(normalizeQuote);
 }
 
 export async function getQuotesForPost(postId) {
+  if (!supabase || !postId) return [];
+
   const { data, error } = await supabase
     .from('quotes')
-    .select('*')
+    .select(`
+      *,
+      businesses:business_id (
+        id,
+        name,
+        category,
+        city,
+        locality
+      )
+    `)
     .eq('post_id', postId)
-    .eq('is_removed', false)
-    .order('price', { ascending: true })
-  if (error) throw error
-  return (data || []).map(normalizeQuote)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getQuotesForPost error:', error);
+    return [];
+  }
+
+  return (data || []).map(normalizeQuote);
 }
 
-export async function submitQuote(postId, userId, quoteData) {
+export async function submitQuote(postId, userId, quoteData = {}) {
+  if (!supabase) throw new Error('Supabase is not initialized');
+  if (!postId) throw new Error('postId is required');
+  if (!userId) throw new Error('userId is required');
+
+  const { data: business, error: businessError } = await supabase
+    .from('businesses')
+    .select('id, name, category')
+    .eq('owner_id', userId)
+    .maybeSingle();
+
+  if (businessError) {
+    console.error('submitQuote business lookup error:', businessError);
+    throw businessError;
+  }
+
+  if (!business?.id) {
+    throw new Error('No business profile found for this shop owner');
+  }
+
+  const price = Number(quoteData.price ?? 0);
+  const deliveryCharge = Number(quoteData.deliveryCharge ?? 0);
+
+  const payload = {
+    post_id: postId,
+    business_id: business.id,
+    shop_owner_id: userId,
+    quoted_price_paise: Math.round(price * 100),
+    delivery_fee_paise: Math.round(deliveryCharge * 100),
+    estimated_minutes: quoteData.deliveryTime
+      ? Number(quoteData.deliveryTime)
+      : null,
+    note: quoteData.note ?? quoteData.message ?? '',
+    status: 'pending',
+  };
+
   const { data, error } = await supabase
     .from('quotes')
-    .insert({
-      post_id:           postId,
-      submitted_by:      userId,
-      shop_name:         quoteData.shopName,
-      shop_category:     quoteData.shopCategory || null,
-      price:             quoteData.price,
-      delivery_time:     quoteData.deliveryTime || null,
-      delivery_charge:   quoteData.deliveryCharge || 0,
-      pickup_available:  quoteData.pickupAvailable || false,
-      delivery_available: quoteData.deliveryAvailable !== false,
-      payment_mode:      quoteData.paymentMode || 'both',
-      message:           quoteData.message || '',
-      is_available:      quoteData.isAvailable || 'yes',
-    })
-    .select()
-    .single()
-  if (error) throw error
-  return normalizeQuote(data)
+    .insert(payload)
+    .select(`
+      *,
+      businesses:business_id (
+        id,
+        name,
+        category,
+        city,
+        locality
+      )
+    `)
+    .single();
+
+  if (error) {
+    console.error('submitQuote error:', error);
+    throw error;
+  }
+
+  return normalizeQuote(data);
 }
 
 export async function selectQuote(postId, quoteId) {
@@ -999,7 +1119,7 @@ export async function markPostBought(postId) {
 export async function adminRemoveQuote(quoteId) {
   const { error } = await supabase
     .from('quotes')
-    .update({ is_removed: true })
+    .update({ status: 'withdrawn' })
     .eq('id', quoteId)
   if (error) throw error
 }

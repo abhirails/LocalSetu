@@ -1,23 +1,29 @@
 @import "tailwindcss";
+@source ".";
+@source "../index.html";
+
+
 
 /* ==============================
    LocalSetu Design System
    ============================== */
 
 :root {
-  /* Upgrade to warm premium sunset orange */
-  --primary: #FF5C26;
-  --primary-light: #FFF3EC;
-  --primary-dark: #E04612;
-  --navy: #18192A;
-  --navy-light: #2C2C46;
+  /* Upgrade to premium teal from Stitch */
+  --primary: #00685e;
+  --primary-light: #f0fdfa;
+  --primary-dark: #005049;
+  --saffron: #FF9933;
+  --marigold: #F5A623;
+  --navy: #141b2b;
+  --navy-light: #293040;
 
   /* Premium Warm Light Theme */
-  --bg: #FDFBF7;
-  --bg-alt: #F4F1EA;
-  --card: #FFFFFF;
-  --card-border: rgba(25, 20, 10, 0.04);
-  --card-shadow: 0 6px 16px rgba(25, 20, 10, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --bg: #f9f9ff;
+  --bg-alt: #f1f3ff;
+  --card: #ffffff;
+  --card-border: #bcc9c6;
+  --card-shadow: 0 4px 16px rgba(0, 104, 94, 0.04);
 
   --text-primary: #1E1F24;
   --text-secondary: #525866;
@@ -82,9 +88,9 @@
   --max-width: 480px;
   --bottom-nav-height: 72px;
   --header-height: 60px;
-  --radius-sm: 10px;
-  --radius: 16px;
-  --radius-lg: 24px;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
   --shadow: 0 4px 16px rgba(25, 20, 10, 0.04);
   --shadow-lg: 0 8px 32px rgba(25, 20, 10, 0.08);
 }
@@ -194,7 +200,7 @@ img {
   font-size: 21px;
   font-weight: 800;
   letter-spacing: -0.6px;
-  background: linear-gradient(135deg, var(--primary) 0%, #FF8A50 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #14B8A6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
@@ -302,7 +308,7 @@ img {
   flex: none;
   width: 52px;
   height: 52px;
-  background: linear-gradient(135deg, var(--primary) 0%, #FF8533 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #2DD4BF 100%);
   color: white;
   border-radius: 18px;
   display: flex;
@@ -907,13 +913,13 @@ img {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, #FF7E47 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #2DD4BF 100%);
   color: white;
 }
 
 .btn-primary:hover {
   background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-  box-shadow: 0 4px 12px rgba(255, 92, 38, 0.2);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
 }
 
 .btn-secondary {
@@ -1204,7 +1210,7 @@ img {
 .demo-user-btn:hover {
   border-color: var(--primary);
   background: var(--primary-light);
-  box-shadow: 0 4px 12px rgba(255, 92, 38, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 104, 94, 0.08);
 }
 
 .demo-user-btn:active {
@@ -1565,7 +1571,7 @@ img {
   width: 72px;
   height: 72px;
   border-radius: 22px;
-  background: linear-gradient(135deg, var(--primary) 0%, #FF8533 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #14B8A6 100%);
   color: white;
   display: flex;
   align-items: center;
@@ -1862,7 +1868,7 @@ img {
 }
 
 .locality-hero {
-  background: linear-gradient(160deg, var(--primary) 0%, #FF8C5A 100%);
+  background: linear-gradient(160deg, var(--primary) 0%, #14B8A6 100%);
   padding: 48px 28px 32px;
   color: white;
 }
@@ -1947,4 +1953,49 @@ img {
   border-radius: 20px;
   font-size: 11px;
   font-weight: 700;
+}
+
+.btn-hover-effect {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-hover-effect:active {
+  transform: scale(0.98);
+}
+.jaali-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5L10 30.5L0 20.5L10 10.5L20 20.5ZM40 20.5L30 30.5L20 20.5L30 10.5L40 20.5ZM20 0.5L10 10.5L20 20.5L30 10.5L20 0.5ZM20 40.5L10 30.5L20 20.5L30 30.5L20 40.5Z' fill='%2300685e' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+.font-headline-xl {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+}
+.text-headline-xl {
+  font-size: 30px;
+  line-height: 38px;
+  letter-spacing: -0.02em;
+}
+.font-headline-lg-mobile {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+}
+.text-headline-lg-mobile {
+  font-size: 20px;
+  line-height: 28px;
+}
+.text-label-sm {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+}
+.font-label-sm {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+}
+.font-body-md {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 400;
+}
+.text-body-md {
+  font-size: 16px;
+  line-height: 24px;
 }
