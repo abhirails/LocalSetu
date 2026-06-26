@@ -80,6 +80,12 @@ function reducer(state, action) {
       return { ...state, posts: action.posts }
     case 'ADD_POST':
       return { ...state, posts: [action.post, ...state.posts] }
+    // Real-time insert: only add if not already present (avoids duplicate with optimistic post)
+    case 'REALTIME_ADD_POST': {
+      const alreadyExists = state.posts.some(p => p.id === action.post.id)
+      if (alreadyExists) return state
+      return { ...state, posts: [action.post, ...state.posts] }
+    }
     case 'UPDATE_POST':
       return {
         ...state,
@@ -520,7 +526,24 @@ export function AppProvider({ children }) {
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Real-time: new posts from other users appear instantly in the feed
+    const realtimeChannel = supabase
+      .channel('public:posts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
+        const incoming = db.normalizePost(payload.new)
+        // Only add if not already in state (avoids duplicating our own optimistic posts)
+        dispatch({ type: 'REALTIME_ADD_POST', post: incoming })
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, payload => {
+        const updated = db.normalizePost(payload.new)
+        dispatch({ type: 'UPDATE_POST', post: updated })
+      })
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+      supabase.removeChannel(realtimeChannel)
+    }
   }, [])
 
   // ────────────────────────────────────────────────────────
@@ -1176,6 +1199,12 @@ export function AppProvider({ children }) {
 
     setLiveLocality: (locality, coords, status = 'granted') => {
       dispatch({ type: 'SET_LIVE_LOCALITY', locality, coords, status })
+      // Persist detected locality to user profile so it survives app restarts
+      if (isSupabaseConfigured && locality && state.currentUser?.id) {
+        db.updateProfile(state.currentUser.id, { locality }).catch(err =>
+          console.warn('LocalSetu: could not save locality to profile', err)
+        )
+      }
     },
 
     setLocationStatus: (status) => {

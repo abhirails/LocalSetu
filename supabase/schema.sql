@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   name          TEXT NOT NULL DEFAULT 'Local Resident',
   phone         TEXT,
   email         TEXT,
-  locality      TEXT NOT NULL DEFAULT 'Kharghar',
+  locality      TEXT NOT NULL DEFAULT '',
   role          TEXT NOT NULL DEFAULT 'resident'
                   CHECK (role IN ('resident', 'admin', 'moderator', 'society_admin', 'business_owner')),
   society_id    UUID,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS phone TEXT,
   ADD COLUMN IF NOT EXISTS email TEXT,
-  ADD COLUMN IF NOT EXISTS locality TEXT NOT NULL DEFAULT 'Kharghar',
+  ADD COLUMN IF NOT EXISTS locality TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS society_id UUID,
   ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS trust_score INTEGER NOT NULL DEFAULT 50,
@@ -98,6 +98,18 @@ CREATE TABLE IF NOT EXISTS public.posts (
   medical_disclaimer_accepted BOOLEAN NOT NULL DEFAULT false,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Idempotent guard: add user_id if table was created by an older schema run that lacked it
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'posts' AND column_name = 'user_id'
+  ) THEN
+    ALTER TABLE public.posts
+      ADD COLUMN user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
 ALTER TABLE public.posts
   ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ,
@@ -201,7 +213,7 @@ CREATE TABLE IF NOT EXISTS public.saved_posts (
 CREATE TABLE IF NOT EXISTS public.societies (
   id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name           TEXT NOT NULL,
-  locality       TEXT NOT NULL DEFAULT 'Kharghar',
+  locality       TEXT NOT NULL DEFAULT '',
   sector         TEXT,
   landmark       TEXT,
   description    TEXT,
@@ -739,12 +751,33 @@ ALTER TABLE public.complaints          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quotes              ENABLE ROW LEVEL SECURITY;
 
 -- Recreate policies idempotently.
+-- PATCH 1: Restrict profile reads — phone/email must not be publicly visible.
+-- Only own profile and admins get full row access; everyone else uses public_profiles view.
 DROP POLICY IF EXISTS "Public profiles visible to all" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can update profiles" ON public.profiles;
-CREATE POLICY "Public profiles visible to all" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id OR public.is_admin());
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Admins can update profiles" ON public.profiles FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+-- Safe public view: no phone, no email, no blocked_users list.
+CREATE OR REPLACE VIEW public.public_profiles AS
+SELECT
+  id,
+  name,
+  locality,
+  role,
+  society_id,
+  is_verified,
+  trust_score,
+  posts_count,
+  help_count,
+  created_at
+FROM public.profiles
+WHERE is_banned = false;
+
+GRANT SELECT ON public.public_profiles TO anon, authenticated;
 
 DROP POLICY IF EXISTS "Active posts visible to all" ON public.posts;
 DROP POLICY IF EXISTS "Authenticated users can create posts" ON public.posts;
@@ -754,6 +787,30 @@ CREATE POLICY "Active posts visible to all" ON public.posts FOR SELECT USING (st
 CREATE POLICY "Authenticated users can create posts" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own posts" ON public.posts FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Admins can update any post" ON public.posts FOR UPDATE USING (public.is_admin());
+
+-- PATCH 2: Prevent users from self-elevating system-controlled post fields.
+-- Trigger resets protected fields to their OLD values when a non-admin user updates their own post.
+CREATE OR REPLACE FUNCTION public.protect_post_system_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF auth.uid() = OLD.user_id AND NOT public.is_admin() THEN
+    NEW.is_boosted          := OLD.is_boosted;
+    NEW.boosted_until       := OLD.boosted_until;
+    NEW.report_count        := OLD.report_count;
+    NEW.selected_quote_id   := OLD.selected_quote_id;
+    NEW.is_bought           := OLD.is_bought;
+    NEW.civic_status        := OLD.civic_status;
+    NEW.civic_reference_no  := OLD.civic_reference_no;
+    NEW.civic_digest_sent_at := OLD.civic_digest_sent_at;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trg_protect_post_system_fields ON public.posts;
+CREATE TRIGGER trg_protect_post_system_fields
+  BEFORE UPDATE ON public.posts
+  FOR EACH ROW EXECUTE FUNCTION public.protect_post_system_fields();
 
 DROP POLICY IF EXISTS "Confirmations visible to all" ON public.post_confirmations;
 DROP POLICY IF EXISTS "Authenticated users can confirm" ON public.post_confirmations;
@@ -915,7 +972,59 @@ CREATE POLICY "Business owners can create quotes" ON public.quotes FOR INSERT WI
     )
   )
 );
+-- Shop owners can withdraw/update their own pending quotes only (not accept/reject — that's the RPC's job)
 CREATE POLICY "Shop owners can update own quotes" ON public.quotes FOR UPDATE USING (auth.uid() = shop_owner_id OR public.is_admin());
+
+-- PATCH 3: Safe atomic quote acceptance via RPC.
+-- Accepts one quote, rejects all others for the same post, and marks post fulfilled.
+-- Only the post owner can call this. Direct UPDATE of quote status by non-admins is disallowed through this flow.
+CREATE OR REPLACE FUNCTION public.accept_quote(p_quote_id UUID)
+RETURNS public.quotes AS $$
+DECLARE
+  v_quote public.quotes;
+  v_post  public.posts;
+BEGIN
+  SELECT * INTO v_quote FROM public.quotes WHERE id = p_quote_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Quote not found';
+  END IF;
+
+  SELECT * INTO v_post FROM public.posts WHERE id = v_quote.post_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Post not found';
+  END IF;
+
+  IF v_post.user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'Only the post owner can accept a quote';
+  END IF;
+
+  IF v_quote.status <> 'pending' THEN
+    RAISE EXCEPTION 'Only pending quotes can be accepted';
+  END IF;
+
+  -- Reject all other pending quotes for this post
+  UPDATE public.quotes
+  SET status = 'rejected', updated_at = NOW()
+  WHERE post_id = v_quote.post_id
+    AND id <> p_quote_id
+    AND status = 'pending';
+
+  -- Accept this one
+  UPDATE public.quotes
+  SET status = 'accepted', accepted_at = NOW(), updated_at = NOW()
+  WHERE id = p_quote_id
+  RETURNING * INTO v_quote;
+
+  -- Mark post fulfilled
+  UPDATE public.posts
+  SET selected_quote_id = p_quote_id, is_fulfilled = true
+  WHERE id = v_quote.post_id;
+
+  RETURN v_quote;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION public.accept_quote(UUID) TO authenticated;
 
 -- ============================================================
 -- REALTIME PUBLICATION
