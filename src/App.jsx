@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import { cx, ui } from './lib/ui'
 
@@ -20,6 +20,7 @@ import BusinessDetailScreen    from './screens/BusinessDetailScreen'
 import RegisterBusinessScreen  from './screens/RegisterBusinessScreen'
 import RegisterSocietyScreen  from './screens/RegisterSocietyScreen'
 import MaintenanceScreen       from './screens/MaintenanceScreen'
+import NeedToBuyPublicScreen   from './screens/NeedToBuyPublicScreen'
 import InstallPrompt           from './components/InstallPrompt'
 
 class ErrorBoundary extends React.Component {
@@ -89,9 +90,16 @@ function AuthGuard({ children }) {
   return children
 }
 
+function isPublicNeedToBuyPath(pathname) {
+  return pathname === '/need-to-buy' || /^\/[^/]+\/need-to-buy$/.test(pathname)
+}
+
 function AppRoutes() {
   const { state } = useApp()
-  if (state.loading) return <LoadingScreen />
+  const location = useLocation()
+  const publicNeedToBuy = isPublicNeedToBuyPath(location.pathname)
+
+  if (state.loading && !publicNeedToBuy) return <LoadingScreen />
 
   return (
     <div className={ui.appShell}>
@@ -114,6 +122,9 @@ function AppRoutes() {
         <Route path="/register-business" element={<AuthGuard><RegisterBusinessScreen /></AuthGuard>} />
         <Route path="/register-society"  element={<AuthGuard><RegisterSocietyScreen /></AuthGuard>} />
         <Route path="/maintenance"       element={<AuthGuard><MaintenanceScreen /></AuthGuard>} />
+        {/* Public routes — no login required */}
+        <Route path="/need-to-buy"                     element={<NeedToBuyPublicScreen />} />
+        <Route path="/:localitySlug/need-to-buy"       element={<NeedToBuyPublicScreen />} />
         <Route path="/" element={<Navigate to={state.currentUser ? '/home' : '/login'} replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

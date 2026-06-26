@@ -287,6 +287,13 @@ export function findLocality(name) {
   ) || null
 }
 
+/** Resolve /:localitySlug/need-to-buy → { locality, label, city } */
+export function findLocalityBySlug(slug) {
+  if (!slug) return null
+  const q = slug.toLowerCase()
+  return ALL_LOCALITIES.find(l => l.localitySlug === q) || null
+}
+
 // ── Helper: get cities for a state ───────────────────────────────────────────
 export function getCitiesForState(stateSlug) {
   const s = INDIA_LOCATIONS.find(s => s.stateSlug === stateSlug)

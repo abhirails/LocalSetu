@@ -94,6 +94,14 @@ export async function createPost(post) {
     distance_range:        post.distanceRange || null,
   }
 
+  if (post.category === 'need_to_buy') {
+    if (post.needToBuyItem != null) payload.need_to_buy_item = post.needToBuyItem
+    if (post.needToBuyQty != null) payload.need_to_buy_qty = post.needToBuyQty
+    if (post.deliveryPref != null) payload.delivery_pref = post.deliveryPref
+    if (post.budget != null) payload.budget_paise = Math.round(Number(post.budget) * 100)
+    else if (post.budgetPaise != null) payload.budget_paise = post.budgetPaise
+  }
+
   const { data, error } = await supabase
     .from('posts')
     .insert(payload)
@@ -394,6 +402,13 @@ export function normalizePost(p) {
     distanceRange:        p.distance_range,
     helperCount:          p.helper_count,
     isFulfilled:          p.is_fulfilled,
+    selectedQuoteId:      p.selected_quote_id ?? null,
+    isBought:             p.is_bought ?? false,
+    needToBuyItem:        p.need_to_buy_item ?? null,
+    needToBuyQty:         p.need_to_buy_qty ?? null,
+    deliveryPref:         p.delivery_pref ?? null,
+    budget:               p.budget_paise != null ? Math.round(p.budget_paise / 100) : null,
+    budgetPaise:          p.budget_paise ?? null,
     // Phase 4 — Boost
     isBoosted:            p.is_boosted ?? false,
     boostedUntil:         p.boosted_until ?? null,

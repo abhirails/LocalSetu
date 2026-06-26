@@ -535,7 +535,16 @@ export function AppProvider({ children }) {
       if (session?.user) {
         loadData(session.user.id)
       } else {
-        dispatch({ type: 'SET_LOADING', value: false })
+        // Guest: load public feed so /need-to-buy can show live requests
+        Promise.all([
+          db.getPosts().catch(() => []),
+          db.getQuotes().catch(() => []),
+        ]).then(([posts, quotes]) => {
+          dispatch({ type: 'SET_POSTS', posts })
+          dispatch({ type: 'SET_QUOTES', payload: quotes, quotes })
+        }).finally(() => {
+          dispatch({ type: 'SET_LOADING', value: false })
+        })
       }
     })
 
@@ -618,16 +627,19 @@ export function AppProvider({ children }) {
       dispatch({ type: 'ADD_POST', post: optimistic })
       toast('Posted to your locality!')
 
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && state.currentUser?.id) {
         try {
           const real = await db.createPost({ ...postData, userId: state.currentUser.id })
           dispatch({ type: 'UPDATE_POST', post: { ...optimistic, ...real, id: real.id } })
           dispatch({ type: 'ADMIN_REMOVE_POST', postId: optimistic.id })
           dispatch({ type: 'ADD_POST', post: real })
+          return real
         } catch (err) {
           console.error('LocalSetu: failed to create post', err)
+          throw err
         }
       }
+      return optimistic
     },
 
     addProvider: async (providerData) => {

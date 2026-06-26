@@ -209,6 +209,16 @@ export default function HelpScreen() {
                 </button>
               ))}
             </div>
+            <div style={{ background: '#FFF8F0', padding: '10px 16px', fontSize: 12, color: '#92400E', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span>🛒 Need something from a shop? Share the public link or post here.</span>
+              <button
+                type="button"
+                onClick={() => navigate('/need-to-buy')}
+                style={{ flexShrink: 0, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 16, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Need to Buy
+              </button>
+            </div>
             <div style={{ background: '#FFF8F0', padding: '8px 16px', fontSize: 12, color: '#92400E', fontWeight: 600, display: 'flex', gap: 6, borderBottom: '1px solid var(--border-light)' }}>
               ⚠️ Meet in public · Don't share exact address · Verify before meeting
             </div>
