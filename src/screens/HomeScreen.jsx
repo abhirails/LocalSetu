@@ -22,6 +22,7 @@ export default function HomeScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
   const [showLocalitySwitcher, setShowLocalitySwitcher] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const { locality: liveLocality, coords: liveCoords, status: locationStatus, requestLocation } = useCurrentLocation()
   const radiusFilter = state.radiusFilter
@@ -206,17 +207,77 @@ export default function HomeScreen() {
     }
     if (activeTab === 'need_it_now') {
       const sorted = sortWithNearby(needItNowPosts)
+      const locality = state.currentUser?.locality || ''
+      const localitySlug = locality
+        ? locality.split(',')[0].trim().toLowerCase().replace(/\s+/g, '-')
+        : null
+      const directLink = localitySlug
+        ? `${window.location.origin}/${localitySlug}/need-to-buy`
+        : `${window.location.origin}/need-to-buy`
+
+      const NeedToBuyBanner = () => (
+        <div style={{
+          margin: '10px 14px', padding: '14px 16px',
+          background: 'linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%)',
+          border: '1.5px solid #A7F3D0', borderRadius: 14,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <span style={{ fontSize: 20 }}>🛒</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Need to Buy from nearby shops?</span>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 10px', lineHeight: 1.5 }}>
+            Post what you need. Shops quote price and delivery time. No payment inside the app.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => navigate('/create')}
+              style={{
+                fontSize: 12, fontWeight: 700, padding: '6px 14px',
+                background: 'var(--primary)', color: 'white',
+                border: 'none', borderRadius: 20, cursor: 'pointer',
+              }}
+            >
+              + Post your need
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(directLink).catch(() => {})
+                setLinkCopied(true)
+                setTimeout(() => setLinkCopied(false), 2000)
+              }}
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '6px 14px',
+                background: linkCopied ? 'var(--success-light)' : 'white',
+                color: linkCopied ? 'var(--success)' : 'var(--primary)',
+                border: `1.5px solid ${linkCopied ? 'var(--success)' : 'var(--primary)'}`,
+                borderRadius: 20, cursor: 'pointer', transition: 'all 0.2s',
+              }}
+            >
+              {linkCopied ? '✓ Copied!' : '🔗 Copy shareable link'}
+            </button>
+          </div>
+        </div>
+      )
+
       if (sorted.length === 0) {
         return (
-          <div className="empty-state">
-            <div className="empty-icon">🙋</div>
-            <div className="empty-title">No urgent requests</div>
-            <div className="empty-sub">Post a local need — borrow, rideshare, or urgent help.</div>
-            <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Post a need</button>
-          </div>
+          <>
+            <NeedToBuyBanner />
+            <div className="empty-state">
+              <div className="empty-icon">🙋</div>
+              <div className="empty-title">No urgent requests</div>
+              <div className="empty-sub">Post a local need — borrow, rideshare, or urgent help.</div>
+              <button className="btn btn-primary" style={{ width: 'auto', marginTop: 8 }} onClick={() => navigate('/create')}>+ Post a need</button>
+            </div>
+          </>
         )
       }
-      return <div className="card-list">{sorted.map(post => <PostCard key={post.id} post={post} />)}</div>
+      return (
+        <>
+          <NeedToBuyBanner />
+          <div className="card-list">{sorted.map(post => <PostCard key={post.id} post={post} />)}</div>
+        </>
+      )
     }
     if (activeTab === 'verified_help') {
       return (

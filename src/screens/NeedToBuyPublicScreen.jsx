@@ -93,6 +93,41 @@ const DEMO_REQUESTS = [
   },
 ]
 
+// ─── Smart paste parser ───────────────────────────────────────────────────────
+// No AI needed — shopping lists always use predictable delimiters.
+
+function parsePastedList(rawText) {
+  // 1. Strip common prefixes: "🛒 RasoiSetu — Upma shopping list: •"
+  let text = rawText
+    .replace(/^[^\wऀ-ॿ•\-*]*(shopping list|grocery list|items? needed|items? required|buy list)[:\s—–-]*/i, '')
+    .replace(/^[\p{Emoji}\s]*/u, '')
+    .trim()
+
+  // 2. Try splitting strategies in priority order
+  const strategies = [
+    // Bullets / pipes
+    () => text.split(/[•·|]/).map(s => s.trim()).filter(s => s.length > 1),
+    // Newlines
+    () => text.split(/[\n\r]+/).map(s => s.trim()).filter(s => s.length > 1),
+    // Numbered list: "1. item" or "1) item"
+    () => text.split(/\d+[.)]\s+/).map(s => s.trim()).filter(s => s.length > 1),
+    // Semicolons or commas (only if many items)
+    () => text.split(/[;,]/).map(s => s.trim()).filter(s => s.length > 1),
+  ]
+
+  for (const strategy of strategies) {
+    const items = strategy()
+    if (items.length >= 2) {
+      // Clean leading bullets/dashes/numbers from each item
+      return items
+        .map(s => s.replace(/^[-–•·*\d.)\s]+/, '').trim())
+        .filter(s => s.length > 0 && s.length < 120)
+        .slice(0, 20) // max 20 items
+    }
+  }
+  return [] // single item — let normal input handle it
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr) {
@@ -421,6 +456,7 @@ export default function NeedToBuyPublicScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   const [item, setItem] = useState(searchParams.get('item') || '')
+  const [itemChips, setItemChips] = useState([]) // populated when user pastes a list
   const [qty, setQty] = useState('')
   const [neededByOption, setNeededByOption] = useState('3h')
   const [delivery, setDelivery] = useState('delivery')
@@ -461,7 +497,10 @@ export default function NeedToBuyPublicScreen() {
     : listingSource.filter(r => r.category === activeCategory)
 
   const handleSubmitForm = () => {
-    if (!item.trim()) { setFormError('Please describe what you need.'); return }
+    const effectiveItem = itemChips.length > 0
+      ? itemChips.join(' • ')
+      : item.trim()
+    if (!effectiveItem) { setFormError('Please describe what you need.'); return }
     setFormError('')
     if (isLoggedIn) {
       doSubmit()
@@ -498,16 +537,20 @@ export default function NeedToBuyPublicScreen() {
     }
 
     try {
+      const effectiveItem = itemChips.length > 0
+        ? itemChips.join(' • ')
+        : item.trim()
       const created = await actions.addPost({
         type: 'need_it_now',
         userId,
         category: 'need_to_buy',
         locality: localityLabel || userLocality || 'Kharghar, Navi Mumbai',
         content: buildPostContent({
-          item, qty, notes,
+          item: effectiveItem, qty, notes,
           source: source !== 'direct' ? source : null,
         }),
-        needToBuyItem: item.trim(),
+        needToBuyItem: effectiveItem,
+        itemCount: itemChips.length > 1 ? itemChips.length : null,
         needToBuyQty: qty.trim() || null,
         deliveryPref: delivery,
         budget: budget ? Number(budget) : null,
@@ -571,6 +614,7 @@ export default function NeedToBuyPublicScreen() {
             setShowForm(false)
             setCreatedPostId(null)
             setItem('')
+            setItemChips([])
             setQty('')
             setBudget('')
             setNotes('')
@@ -651,14 +695,74 @@ export default function NeedToBuyPublicScreen() {
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                   Item / Requirement *
+                  {itemChips.length > 1 && (
+                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: 'var(--success)', background: 'var(--success-light)', padding: '2px 7px', borderRadius: 20 }}>
+                      {itemChips.length} items
+                    </span>
+                  )}
                 </label>
-                <input
-                  className={ui.formInput}
-                  placeholder="e.g. Modular 16A socket, A4 paper ream, Brass elbow joint"
-                  value={item}
-                  onChange={e => { setItem(e.target.value); setFormError('') }}
-                  autoFocus
-                />
+
+                {/* Chip mode: shown after multi-item paste */}
+                {itemChips.length > 0 ? (
+                  <div style={{
+                    border: '1.5px solid var(--primary)', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--card)', padding: '8px 10px',
+                    display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 48,
+                  }}>
+                    {itemChips.map((chip, i) => (
+                      <span key={i} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: 'var(--primary-light)', color: 'var(--primary)',
+                        border: '1px solid var(--primary)', borderRadius: 20,
+                        fontSize: 12, fontWeight: 600, padding: '4px 10px',
+                      }}>
+                        {chip}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = itemChips.filter((_, j) => j !== i)
+                            if (next.length === 0) { setItemChips([]); setItem('') }
+                            else setItemChips(next)
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 14, lineHeight: 1, padding: '0 0 0 2px', fontWeight: 700 }}
+                        >×</button>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => { setItemChips([]); setItem('') }}
+                      style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', alignSelf: 'center', marginLeft: 'auto' }}
+                    >
+                      Clear list
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    className={ui.formInput}
+                    placeholder="Type item, or paste a shopping list…"
+                    value={item}
+                    onChange={e => { setItem(e.target.value); setFormError('') }}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData('text')
+                      const chips = parsePastedList(pasted)
+                      if (chips.length >= 2) {
+                        e.preventDefault()
+                        setItemChips(chips)
+                        setItem('')
+                        setFormError('')
+                      }
+                      // else: let normal paste happen
+                    }}
+                    autoFocus
+                  />
+                )}
+
+                {/* Paste hint */}
+                {itemChips.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    💡 Paste a shopping list — items will be detected automatically
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

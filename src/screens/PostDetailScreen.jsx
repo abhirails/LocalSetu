@@ -274,6 +274,37 @@ export default function PostDetailScreen() {
               </div>
             </div>
 
+            {/* Share direct link */}
+            {(() => {
+              const locality = post.locality || ''
+              const slug = locality.split(',')[0].trim().toLowerCase().replace(/\s+/g, '-')
+              const link = slug
+                ? `${window.location.origin}/${slug}/need-to-buy`
+                : `${window.location.origin}/need-to-buy`
+              return (
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(link).catch(() => {})
+                    setShareFeedback('copied')
+                    setTimeout(() => setShareFeedback(''), 2000)
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12,
+                    width: '100%', padding: '8px 14px', fontSize: 12, fontWeight: 600,
+                    background: shareFeedback === 'copied' ? '#DCFCE7' : '#F0FDF4',
+                    color: shareFeedback === 'copied' ? 'var(--success)' : 'var(--primary)',
+                    border: `1.5px solid ${shareFeedback === 'copied' ? '#86EFAC' : '#A7F3D0'}`,
+                    borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span>{shareFeedback === 'copied' ? '✓' : '🔗'}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</span>
+                  <span style={{ flexShrink: 0, fontWeight: 700 }}>{shareFeedback === 'copied' ? 'Copied!' : 'Copy'}</span>
+                </button>
+              )
+            })()}
+
             {/* Safety warning */}
             <div className="safety-box" style={{ marginBottom: 12 }}>
               <div className="safety-title">⚠️ Safety Reminder</div>
