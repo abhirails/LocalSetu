@@ -96,34 +96,47 @@ const DEMO_REQUESTS = [
 // ─── Smart paste parser ───────────────────────────────────────────────────────
 // No AI needed — shopping lists always use predictable delimiters.
 
+// Patterns that indicate a chip is a list title / app attribution, not an item
+const LIST_HEADER_RE = /shopping list|grocery list|items? needed|buy list|made with|powered by|via |shared (from|via)|recipe|— upma|— dal|— sabzi/i
+const SHORT_ATTRIBUTION_RE = /^(made with|powered by|via |shared (from|via)|\w+setu|\w+app)/i
+
+function isNoise(s) {
+  if (!s || s.length < 2) return true
+  if (s.length > 80) return true               // suspiciously long — probably header blob
+  if (LIST_HEADER_RE.test(s)) return true
+  if (SHORT_ATTRIBUTION_RE.test(s)) return true
+  return false
+}
+
 function parsePastedList(rawText) {
-  // 1. Strip common prefixes: "🛒 RasoiSetu — Upma shopping list: •"
+  // 1. Strip everything up to (and including) first list-header keyword
   let text = rawText
-    .replace(/^[^\wऀ-ॿ•\-*]*(shopping list|grocery list|items? needed|items? required|buy list)[:\s—–-]*/i, '')
-    .replace(/^[\p{Emoji}\s]*/u, '')
+    .replace(/^.*?(shopping list|grocery list|items? needed|items? required|buy list|recipe)[:\s—–\-]*/i, '')
+    .replace(/^[\p{Emoji}\s•·\-]*/u, '')
     .trim()
+
+  // If stripping changed nothing meaningful, use the full raw text
+  if (!text || text.length < 3) text = rawText.trim()
 
   // 2. Try splitting strategies in priority order
   const strategies = [
-    // Bullets / pipes
-    () => text.split(/[•·|]/).map(s => s.trim()).filter(s => s.length > 1),
-    // Newlines
-    () => text.split(/[\n\r]+/).map(s => s.trim()).filter(s => s.length > 1),
-    // Numbered list: "1. item" or "1) item"
-    () => text.split(/\d+[.)]\s+/).map(s => s.trim()).filter(s => s.length > 1),
-    // Semicolons or commas (only if many items)
-    () => text.split(/[;,]/).map(s => s.trim()).filter(s => s.length > 1),
+    () => text.split(/[•·|]/).map(s => s.trim()),          // bullets / pipes
+    () => text.split(/[\n\r]+/).map(s => s.trim()),         // newlines
+    () => text.split(/\d+[.)]\s+/).map(s => s.trim()),      // numbered list
+    () => text.split(/[;,]/).map(s => s.trim()),            // commas / semicolons
   ]
 
   for (const strategy of strategies) {
-    const items = strategy()
-    if (items.length >= 2) {
-      // Clean leading bullets/dashes/numbers from each item
-      return items
-        .map(s => s.replace(/^[-–•·*\d.)\s]+/, '').trim())
-        .filter(s => s.length > 0 && s.length < 120)
-        .slice(0, 20) // max 20 items
-    }
+    const raw = strategy()
+    if (raw.length < 2) continue
+
+    const items = raw
+      .map(s => s.replace(/^[-–•·*\d.)\s]+/, '').trim())   // strip leading bullets
+      .filter(s => !isNoise(s))
+      .filter(s => s.length > 0 && s.length < 80)
+      .slice(0, 20)
+
+    if (items.length >= 2) return items
   }
   return [] // single item — let normal input handle it
 }
@@ -456,7 +469,9 @@ export default function NeedToBuyPublicScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   const [item, setItem] = useState(searchParams.get('item') || '')
-  const [itemChips, setItemChips] = useState([]) // populated when user pastes a list
+  const [itemChips, setItemChips] = useState([])    // populated when user pastes a list
+  const [chipQtys, setChipQtys] = useState({})      // { [chipIndex]: qtyString }
+  const [editingQtyIdx, setEditingQtyIdx] = useState(null) // which chip qty is open
   const [qty, setQty] = useState('')
   const [neededByOption, setNeededByOption] = useState('3h')
   const [delivery, setDelivery] = useState('delivery')
@@ -538,7 +553,7 @@ export default function NeedToBuyPublicScreen() {
 
     try {
       const effectiveItem = itemChips.length > 0
-        ? itemChips.join(' • ')
+        ? itemChips.map((chip, i) => chipQtys[i] ? `${chip} (${chipQtys[i]})` : chip).join(' • ')
         : item.trim()
       const created = await actions.addPost({
         type: 'need_it_now',
@@ -615,6 +630,7 @@ export default function NeedToBuyPublicScreen() {
             setCreatedPostId(null)
             setItem('')
             setItemChips([])
+            setChipQtys({})
             setQty('')
             setBudget('')
             setNotes('')
@@ -706,35 +722,78 @@ export default function NeedToBuyPublicScreen() {
                 {itemChips.length > 0 ? (
                   <div style={{
                     border: '1.5px solid var(--primary)', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--card)', padding: '8px 10px',
-                    display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 48,
+                    background: 'var(--card)', padding: '10px 12px',
+                    display: 'flex', flexDirection: 'column', gap: 6,
                   }}>
                     {itemChips.map((chip, i) => (
-                      <span key={i} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        background: 'var(--primary-light)', color: 'var(--primary)',
-                        border: '1px solid var(--primary)', borderRadius: 20,
-                        fontSize: 12, fontWeight: 600, padding: '4px 10px',
-                      }}>
-                        {chip}
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {/* Item name */}
+                        <span style={{
+                          flex: 1, fontSize: 13, fontWeight: 600,
+                          color: 'var(--text-primary)', minWidth: 0,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {chip}
+                        </span>
+
+                        {/* Inline quantity */}
+                        {editingQtyIdx === i ? (
+                          <input
+                            autoFocus
+                            style={{
+                              width: 90, fontSize: 12, padding: '3px 8px',
+                              border: '1.5px solid var(--primary)', borderRadius: 20,
+                              outline: 'none', background: 'var(--card)',
+                            }}
+                            placeholder="Qty e.g. 2"
+                            value={chipQtys[i] || ''}
+                            onChange={e => setChipQtys(prev => ({ ...prev, [i]: e.target.value }))}
+                            onBlur={() => setEditingQtyIdx(null)}
+                            onKeyDown={e => { if (e.key === 'Enter') setEditingQtyIdx(null) }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEditingQtyIdx(i)}
+                            style={{
+                              fontSize: 11, fontWeight: 600, padding: '3px 9px',
+                              border: `1.5px solid ${chipQtys[i] ? 'var(--primary)' : 'var(--border)'}`,
+                              borderRadius: 20, cursor: 'pointer', whiteSpace: 'nowrap',
+                              background: chipQtys[i] ? 'var(--primary-light)' : 'var(--bg)',
+                              color: chipQtys[i] ? 'var(--primary)' : 'var(--text-muted)',
+                            }}
+                          >
+                            {chipQtys[i] || '+ qty'}
+                          </button>
+                        )}
+
+                        {/* Remove chip */}
                         <button
                           type="button"
                           onClick={() => {
                             const next = itemChips.filter((_, j) => j !== i)
+                            const nextQtys = Object.fromEntries(
+                              Object.entries(chipQtys)
+                                .filter(([k]) => Number(k) !== i)
+                                .map(([k, v]) => [Number(k) > i ? Number(k) - 1 : k, v])
+                            )
+                            setChipQtys(nextQtys)
                             if (next.length === 0) { setItemChips([]); setItem('') }
                             else setItemChips(next)
                           }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 14, lineHeight: 1, padding: '0 0 0 2px', fontWeight: 700 }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
                         >×</button>
-                      </span>
+                      </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() => { setItemChips([]); setItem('') }}
-                      style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', alignSelf: 'center', marginLeft: 'auto' }}
-                    >
-                      Clear list
-                    </button>
+
+                    <div style={{ borderTop: '1px solid var(--border-light)', marginTop: 2, paddingTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tap <strong>+ qty</strong> to add quantity per item</span>
+                      <button
+                        type="button"
+                        onClick={() => { setItemChips([]); setChipQtys({}); setItem('') }}
+                        style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >Clear list</button>
+                    </div>
                   </div>
                 ) : (
                   <input
@@ -765,16 +824,19 @@ export default function NeedToBuyPublicScreen() {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Quantity</label>
-                  <input
-                    className={ui.formInput}
-                    placeholder="e.g. 2 pieces"
-                    value={qty}
-                    onChange={e => setQty(e.target.value)}
-                  />
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: itemChips.length > 0 ? '1fr' : '1fr 1fr', gap: 10 }}>
+                {/* Single quantity — only shown when NOT in chip mode */}
+                {itemChips.length === 0 && (
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Quantity</label>
+                    <input
+                      className={ui.formInput}
+                      placeholder="e.g. 2 pieces"
+                      value={qty}
+                      onChange={e => setQty(e.target.value)}
+                    />
+                  </div>
+                )}
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Budget (₹)</label>
                   <input
