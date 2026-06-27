@@ -471,7 +471,7 @@ export default function NeedToBuyPublicScreen() {
   const [item, setItem] = useState(searchParams.get('item') || '')
   const [itemChips, setItemChips] = useState([])    // populated when user pastes a list
   const [chipQtys, setChipQtys] = useState({})      // { [chipIndex]: qtyString }
-  const [editingQtyIdx, setEditingQtyIdx] = useState(null) // which chip qty is open
+  const [qtyPopup, setQtyPopup] = useState(null)           // { idx, chip, draft } | null
   const [qty, setQty] = useState('')
   const [neededByOption, setNeededByOption] = useState('3h')
   const [delivery, setDelivery] = useState('delivery')
@@ -726,51 +726,31 @@ export default function NeedToBuyPublicScreen() {
                     display: 'flex', flexDirection: 'column', gap: 6,
                   }}>
                     {itemChips.map((chip, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {/* Item name */}
+                      <div key={i}
+                        onClick={() => setQtyPopup({ idx: i, chip, draft: chipQtys[i] || '' })}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+                          background: chipQtys[i] ? 'var(--primary-light)' : 'var(--bg)',
+                          border: `1.5px solid ${chipQtys[i] ? 'var(--primary)' : 'var(--border-light)'}`,
+                          marginBottom: 2,
+                        }}
+                      >
                         <span style={{
-                          flex: 1, fontSize: 13, fontWeight: 600,
-                          color: 'var(--text-primary)', minWidth: 0,
+                          flex: 1, fontSize: 13, fontWeight: 600, minWidth: 0,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          color: chipQtys[i] ? 'var(--primary)' : 'var(--text-primary)',
+                        }}>{chip}</span>
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                          color: chipQtys[i] ? 'var(--primary)' : 'var(--text-muted)',
                         }}>
-                          {chip}
+                          {chipQtys[i] ? `× ${chipQtys[i]}` : '+ qty'}
                         </span>
-
-                        {/* Inline quantity */}
-                        {editingQtyIdx === i ? (
-                          <input
-                            autoFocus
-                            style={{
-                              width: 90, fontSize: 12, padding: '3px 8px',
-                              border: '1.5px solid var(--primary)', borderRadius: 20,
-                              outline: 'none', background: 'var(--card)',
-                            }}
-                            placeholder="Qty e.g. 2"
-                            value={chipQtys[i] || ''}
-                            onChange={e => setChipQtys(prev => ({ ...prev, [i]: e.target.value }))}
-                            onBlur={() => setEditingQtyIdx(null)}
-                            onKeyDown={e => { if (e.key === 'Enter') setEditingQtyIdx(null) }}
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setEditingQtyIdx(i)}
-                            style={{
-                              fontSize: 11, fontWeight: 600, padding: '3px 9px',
-                              border: `1.5px solid ${chipQtys[i] ? 'var(--primary)' : 'var(--border)'}`,
-                              borderRadius: 20, cursor: 'pointer', whiteSpace: 'nowrap',
-                              background: chipQtys[i] ? 'var(--primary-light)' : 'var(--bg)',
-                              color: chipQtys[i] ? 'var(--primary)' : 'var(--text-muted)',
-                            }}
-                          >
-                            {chipQtys[i] || '+ qty'}
-                          </button>
-                        )}
-
-                        {/* Remove chip */}
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={e => {
+                            e.stopPropagation()
                             const next = itemChips.filter((_, j) => j !== i)
                             const nextQtys = Object.fromEntries(
                               Object.entries(chipQtys)
@@ -781,13 +761,13 @@ export default function NeedToBuyPublicScreen() {
                             if (next.length === 0) { setItemChips([]); setItem('') }
                             else setItemChips(next)
                           }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
                         >×</button>
                       </div>
                     ))}
 
-                    <div style={{ borderTop: '1px solid var(--border-light)', marginTop: 2, paddingTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tap <strong>+ qty</strong> to add quantity per item</span>
+                    <div style={{ borderTop: '1px solid var(--border-light)', marginTop: 4, paddingTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tap an item to set quantity</span>
                       <button
                         type="button"
                         onClick={() => { setItemChips([]); setChipQtys({}); setItem('') }}
@@ -1036,6 +1016,61 @@ export default function NeedToBuyPublicScreen() {
           formData={{ item, qty, neededByOption, delivery, budget, notes }}
           locality={localityLabel || state.currentUser?.locality}
         />
+      )}
+
+      {/* Quantity Popup */}
+      {qtyPopup && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 998,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 24px',
+          }}
+          onClick={() => setQtyPopup(null)}
+        >
+          <div
+            style={{
+              background: 'var(--card)', borderRadius: 16, padding: '20px',
+              width: '100%', maxWidth: 340,
+              boxShadow: '0 8px 40px rgba(25,20,10,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Item</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 16 }}>{qtyPopup.chip}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Quantity</div>
+            <input
+              autoFocus
+              className={ui.formInput}
+              placeholder="e.g. 2, 500g, 1 packet, small piece"
+              value={qtyPopup.draft}
+              onChange={e => setQtyPopup(prev => ({ ...prev, draft: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { setChipQtys(prev => ({ ...prev, [qtyPopup.idx]: qtyPopup.draft.trim() })); setQtyPopup(null) }
+                if (e.key === 'Escape') setQtyPopup(null)
+              }}
+              style={{ marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setQtyPopup(null)}
+                style={{
+                  flex: 1, padding: '10px', fontSize: 13, fontWeight: 600,
+                  border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg)', cursor: 'pointer',
+                }}
+              >Cancel</button>
+              <button
+                type="button"
+                className={cx(ui.btn, ui.btnPrimary)}
+                style={{ flex: 2, padding: '10px' }}
+                onClick={() => { setChipQtys(prev => ({ ...prev, [qtyPopup.idx]: qtyPopup.draft.trim() })); setQtyPopup(null) }}
+              >Done</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
